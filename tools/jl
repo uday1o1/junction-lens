@@ -1,0 +1,95 @@
+#!/bin/sh
+set -eu
+
+JL_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+JL_PATH="$JL_ROOT/.tools/bin:$JL_ROOT/.venv/bin:$PATH"
+export PATH="$JL_PATH"
+UV_CACHE_DIR="$JL_ROOT/.cache/uv"
+export UV_CACHE_DIR
+
+usage() {
+  cat <<'EOF'
+Usage: ./tools/jl <command>
+
+Milestone 0 commands:
+  bootstrap-cpu
+  configure-cpu
+  build-cpu
+  doctor
+  format-check
+  lint
+  typecheck
+  test-cpp
+  test-python
+  test-contract
+  verify-locks [--online]
+  verify-m0-1
+EOF
+}
+
+if [ "$#" -eq 0 ]; then
+  usage
+  exit 2
+fi
+
+JL_COMMAND=$1
+shift
+
+case "$JL_COMMAND" in
+  bootstrap-cpu)
+    python3 "$JL_ROOT/scripts/bootstrap/bootstrap_cpu.py" "$@"
+    ;;
+  configure-cpu)
+    cmake --preset cpu "$@"
+    ;;
+  build-cpu)
+    cmake --build --preset cpu "$@"
+    ;;
+  doctor)
+    uv run --locked junctionlens doctor "$@"
+    ;;
+  format-check)
+    uv run --locked ruff format --check python tests scripts
+    pnpm exec prettier --check package.json pnpm-workspace.yaml
+    ;;
+  lint)
+    uv run --locked ruff check python tests scripts
+    ;;
+  typecheck)
+    uv run --locked mypy
+    ;;
+  test-cpp)
+    ctest --preset cpu "$@"
+    ;;
+  test-python)
+    uv run --locked pytest "$@"
+    ;;
+  test-contract)
+    uv run --locked pytest tests/contract "$@"
+    ;;
+  verify-locks)
+    uv run --locked python -m junctionlens.locks.verify "$@"
+    ;;
+  verify-m0-1)
+    uv lock --check
+    uv sync --locked --extra cpu --extra analytics --extra service
+    CI=true pnpm install --frozen-lockfile --ignore-scripts
+    "$0" configure-cpu
+    "$0" build-cpu
+    "$0" format-check
+    "$0" lint
+    "$0" typecheck
+    "$0" verify-locks
+    "$0" test-cpp
+    "$0" test-python
+    "$0" doctor --json
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    echo "Unknown command: $JL_COMMAND" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

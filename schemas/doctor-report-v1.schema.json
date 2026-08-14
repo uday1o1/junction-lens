@@ -1,0 +1,202 @@
+{
+  "$defs": {
+    "CapabilityEvidence": {
+      "additionalProperties": false,
+      "description": "Bounded evidence from a real capability probe.",
+      "properties": {
+        "capability": {
+          "title": "Capability",
+          "type": "string"
+        },
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Command",
+          "type": "array"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "expected_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Version"
+        },
+        "observed_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed Version"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "requirement": {
+          "$ref": "#/$defs/CapabilityRequirement"
+        },
+        "state": {
+          "$ref": "#/$defs/CapabilityState"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "capability",
+        "state",
+        "requirement",
+        "reason_code",
+        "summary"
+      ],
+      "title": "CapabilityEvidence",
+      "type": "object"
+    },
+    "CapabilityRequirement": {
+      "description": "Role a capability plays in the selected profile.",
+      "enum": [
+        "REQUIRED_LOCAL",
+        "REFERENCE_ONLY",
+        "OPTIONAL",
+        "TARGET_ONLY"
+      ],
+      "title": "CapabilityRequirement",
+      "type": "string"
+    },
+    "CapabilityState": {
+      "description": "Observed state of one capability.",
+      "enum": [
+        "AVAILABLE",
+        "ABSENT",
+        "INACCESSIBLE",
+        "INCOMPATIBLE",
+        "ERROR",
+        "NOT_APPLICABLE"
+      ],
+      "title": "CapabilityState",
+      "type": "string"
+    },
+    "HostEvidence": {
+      "additionalProperties": false,
+      "description": "Observed host identity.",
+      "properties": {
+        "machine": {
+          "title": "Machine",
+          "type": "string"
+        },
+        "python_implementation": {
+          "title": "Python Implementation",
+          "type": "string"
+        },
+        "python_version": {
+          "title": "Python Version",
+          "type": "string"
+        },
+        "release": {
+          "title": "Release",
+          "type": "string"
+        },
+        "system": {
+          "title": "System",
+          "type": "string"
+        }
+      },
+      "required": [
+        "system",
+        "release",
+        "machine",
+        "python_implementation",
+        "python_version"
+      ],
+      "title": "HostEvidence",
+      "type": "object"
+    },
+    "Readiness": {
+      "additionalProperties": false,
+      "description": "Independent readiness status for each evidence boundary.",
+      "properties": {
+        "accelerated_target": {
+          "title": "Accelerated Target",
+          "type": "boolean"
+        },
+        "licensed_data": {
+          "title": "Licensed Data",
+          "type": "boolean"
+        },
+        "linux_x86_64_reference": {
+          "title": "Linux X86 64 Reference",
+          "type": "boolean"
+        },
+        "local_cpu": {
+          "title": "Local Cpu",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "local_cpu",
+        "linux_x86_64_reference",
+        "accelerated_target",
+        "licensed_data"
+      ],
+      "title": "Readiness",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Versioned doctor JSON response.",
+  "properties": {
+    "capabilities": {
+      "items": {
+        "$ref": "#/$defs/CapabilityEvidence"
+      },
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "host": {
+      "$ref": "#/$defs/HostEvidence"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "readiness": {
+      "$ref": "#/$defs/Readiness"
+    },
+    "schema_version": {
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "generated_at",
+    "profile",
+    "host",
+    "readiness",
+    "capabilities"
+  ],
+  "title": "DoctorReport",
+  "type": "object"
+}

@@ -1,0 +1,8 @@
+JunctionLens
+Copyright 2026 JunctionLens contributors
+
+This product includes software developed by the JunctionLens contributors.
+
+OpenLane-V2 devkit code is available separately under Apache License 2.0.
+OpenLane-V2 dataset content is available separately under CC BY-NC-SA 4.0 and requires acceptance of the upstream nuScenes and Argoverse 2 terms.
+No OpenLane-V2 dataset content, derived thumbnails, trained weights, or other restricted artifacts are distributed with this repository.

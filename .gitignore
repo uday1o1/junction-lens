@@ -1,0 +1,36 @@
+# Python and tooling
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# Web
+node_modules/
+web/dist/
+playwright-report/
+test-results/
+
+# Native builds and repository-local tools
+build/
+build-*/
+.tools/
+.cache/
+
+# JunctionLens data and generated evidence
+/artifacts/
+/data/
+/checkpoints/
+/engines/
+/profiles/
+/private-thumbnails/
+.junctionlens/license-acknowledgments/
+
+# Machine-local configuration
+.env
+.env.*
+!.env.example
+.DS_Store

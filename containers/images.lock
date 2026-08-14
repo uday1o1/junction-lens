@@ -1,0 +1,49 @@
+schema_version: "1.0.0"
+platform: linux/amd64
+base_images:
+  cpu:
+    reference: docker.io/library/ubuntu@sha256:019e8eb29a85e74d64925745884f2ec79aa27e3feab36353d24656f4d6b89467
+    source_tag: ubuntu:24.04
+    platform_manifest_sha256: 019e8eb29a85e74d64925745884f2ec79aa27e3feab36353d24656f4d6b89467
+  official_evaluator:
+    reference: docker.io/library/python@sha256:314bc2fb0714b7807bf5699c98f0c73817e579799f2d91567ab7e9510f5601a5
+    source_tag: python:3.8.20-slim-bookworm
+    platform_manifest_sha256: 314bc2fb0714b7807bf5699c98f0c73817e579799f2d91567ab7e9510f5601a5
+  gpu:
+    reference: docker.io/nvidia/cuda@sha256:4b9ed5fa8361736996499f64ecebf25d4ec37ff56e4d11323ccde10aa36e0c43
+    source_tag: nvidia/cuda:12.8.1-devel-ubuntu24.04
+    platform_manifest_sha256: 4b9ed5fa8361736996499f64ecebf25d4ec37ff56e4d11323ccde10aa36e0c43
+runtime_sources:
+  onnxruntime:
+    version: 1.25.0
+    commit: 7a71bc575b189cdedea7fa2c0f87389f870bd10e
+    source_archive_sha256: 071d31a593082dd1d3a8ff3db8a78fba4e3d841653e225e807b1eb709da5f56f
+    linux_x64_cpu_archive_sha256: e0a8998e70416801f9a634a8ea1d369a255ff109741469f9d99cf369a46a1492
+    linux_x64_gpu_archive_sha256: 630d1c292a8e530425bc4047598ce30acece2c4b5b5f4f46b676212302c38d93
+    submodules:
+      onnx: be2b5fde82d9c8874f3d19328bdfe3b6962dc67b
+      libprotobuf-mutator: 7a2ed51a6b682a83e345ff49fc4cfd7ca47550db
+      emsdk: c0bb220cb6e6f4e0fabb6f6db9efd53390ef5e56
+  cuda:
+    version: 12.8.1
+    minimum_qualification_driver: "570.26"
+  cudnn:
+    version: 9.14.0.64
+    runtime_package_sha256: 39f1fbb77aaa73d70f4566526c471a7b3f0dd00bb9b5fd88090d33b00a7a2ff8
+    development_package_sha256: 1fbd6fe1ecd0274308c736b8adccfc374a84e1887d6128599d88b037ed3a3b61
+  tensorrt:
+    version: 10.14.1.48
+    packaging_cuda_version: "12.9"
+    conditional: true
+    runtime_package_sha256: 5f2a8190cdbb2788c04be28a97d71f2f1bc45365dfcada022ea21f178530104d
+    development_package_sha256: 68d002abbd2a1dd16f62b4f89625be64ec06184394e3b215e873b3f655736b6cfeda172
+application_images:
+  cpu:
+    digest: null
+    state: PENDING_REPRODUCIBLE_BUILD
+  gpu:
+    digest: null
+    state: DEFERRED_HARDWARE
+  tensorrt:
+    digest: null
+    state: DEFERRED_CONDITIONAL_HARDWARE

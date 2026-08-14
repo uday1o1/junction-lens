@@ -1,0 +1,141 @@
+schema_version: "1.0.0"
+dataset_id: openlane-v2-v2.1
+dataset_version: "2.1"
+schema_mode: lane-segment-v2.1
+official_source_page: https://github.com/OpenDriveLab/OpenLane-V2/blob/v2.1.0/data/README.md
+devkit:
+  repository: https://github.com/OpenDriveLab/OpenLane-V2.git
+  tag: v2.1.0
+  commit: d731a26bdbf34723dd915ad525c2c2eca19ed8a1
+  source_archive: https://github.com/OpenDriveLab/OpenLane-V2/archive/refs/tags/v2.1.0.tar.gz
+  source_sha256: 5c43ac848ca7909bac731624029f4556b4647fbcb81354e0f94f9edd99e936f1
+  license: Apache-2.0
+dataset_licenses:
+  - CC-BY-NC-SA-4.0
+  - nuScenes-terms
+  - Argoverse-2-terms
+acknowledgment_required: true
+acknowledgment_receipt: .junctionlens/license-acknowledgments/openlane-v2-v2.1.json
+redistribution_allowed: false
+adapter:
+  version: "0.1.0"
+  preprocessing_config_sha256: null
+camera_slot_mappings:
+  nuscenes:
+    CAM_FRONT: FRONT_CENTER
+    CAM_FRONT_LEFT: FRONT_LEFT
+    CAM_FRONT_RIGHT: FRONT_RIGHT
+    CAM_BACK_LEFT: REAR_LEFT
+    CAM_BACK: REAR_CENTER
+    CAM_BACK_RIGHT: REAR_RIGHT
+  argoverse2:
+    ring_front_center: FRONT_CENTER
+    ring_front_left: FRONT_LEFT
+    ring_front_right: FRONT_RIGHT
+    ring_side_left: SIDE_LEFT
+    ring_side_right: SIDE_RIGHT
+    ring_rear_left: REAR_LEFT
+    ring_rear_right: REAR_RIGHT
+enabled_splits:
+  train: model-development
+  val: external-benchmark
+  test: disabled-without-valid-server
+archives:
+  - name: openlane-v2-sample
+    profile: sample
+    purpose: adapter-and-interface-validation
+    published_size: "~300M"
+    published_md5: 21c607fa5a1930275b7f1409b25042a0
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-metadata
+    profile: full
+    purpose: subset-a-annotations
+    published_size: "~8.8G"
+    published_md5: 95bf28ccf22583d20434d75800be065d
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-map-element-bucket
+    profile: full
+    purpose: lane-segment-v2.1-annotations
+    published_size: "~240M"
+    published_md5: 1c1f9d49ecd47d6bc5bf093f38fb68c9
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-image-0
+    profile: full
+    purpose: train-images
+    published_size: "~14.0G"
+    published_md5: 8ade7daeec1b64f8ab91a50c81d812f6
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-image-1
+    profile: full
+    purpose: train-images
+    published_size: "~14.3G"
+    published_md5: c78e776f79e2394d2d5d95b7b5985e0f
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-image-2
+    profile: full
+    purpose: train-images
+    published_size: "~14.2G"
+    published_md5: 4bf09079144aa54cb4dcd5ff6e00cf79
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-image-3
+    profile: full
+    purpose: train-images
+    published_size: "~14.4G"
+    published_md5: fd9e64345445975f462213b209632aee
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-image-4
+    profile: full
+    purpose: train-images
+    published_size: "~14.5G"
+    published_md5: ae07e48c88ea2c3f6afbdf5ff71e9821
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-image-5
+    profile: full
+    purpose: train-images
+    published_size: "~14.2G"
+    published_md5: df62c1f6e6b3fb2a2a0868c78ab19c92
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-image-6
+    profile: full
+    purpose: train-images
+    published_size: "~14.4G"
+    published_md5: 7bff1ce30329235f8e0f25f6f6653b8f
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-image-7
+    profile: full
+    purpose: validation-images
+    published_size: "~21.0G"
+    published_md5: c73af4a7aef2692b96e4e00795120504
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-image-8
+    profile: full
+    purpose: test-images-disabled-by-default
+    published_size: "~21.2G"
+    published_md5: fb2f61e7309e0b48e2697e085a66a259
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-a-sd-map
+    profile: full
+    purpose: optional-sd-map-input
+    published_size: "~7M"
+    published_md5: de22c7be880b667f1b3373ff665aac2e
+    local_byte_size: null
+    local_sha256: null
+  - name: subset-b-metadata
+    profile: subset-b-diagnostic
+    purpose: optional-source-domain-diagnostic
+    published_size: "~7.7G"
+    published_md5: 27696b1ed1d99b1f70fdb68f439dc87d
+    local_byte_size: null
+    local_sha256: null
