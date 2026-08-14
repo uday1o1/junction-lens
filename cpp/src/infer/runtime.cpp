@@ -28,6 +28,7 @@
 #endif
 
 #include "contract/validation.hpp"
+#include "junctionlens/infer/instrumentation.hpp"
 
 namespace junctionlens::infer {
 namespace {
@@ -173,6 +174,10 @@ void ValidateOptions(const RuntimeOptions& options) {
   if (options.provider.profile == ExecutionProviderProfile::kTensorRt &&
       options.provider.cache_root.empty()) {
     throw RuntimeError("RUNTIME_PROVIDER_OPTIONS", "TensorRT requires an explicit cache root");
+  }
+  if (!options.onnx_profile_prefix.empty() &&
+      std::filesystem::exists(options.onnx_profile_prefix)) {
+    throw RuntimeError("RUNTIME_PROFILE_OUTPUT", "ONNX profile prefix already exists");
   }
 }
 
@@ -781,6 +786,53 @@ void RequireCudaSuccess(const cudaError_t status, const std::string_view operati
   }
 }
 
+class CudaEventTimer final {
+ public:
+  CudaEventTimer() {
+    RequireCudaSuccess(cudaEventCreate(&started_), "CUDA timing event creation");
+    try {
+      RequireCudaSuccess(cudaEventCreate(&finished_), "CUDA timing event creation");
+    } catch (...) {
+      static_cast<void>(cudaEventDestroy(started_));
+      throw;
+    }
+  }
+
+  CudaEventTimer(const CudaEventTimer&) = delete;
+  CudaEventTimer& operator=(const CudaEventTimer&) = delete;
+
+  ~CudaEventTimer() {
+    static_cast<void>(cudaEventDestroy(finished_));
+    static_cast<void>(cudaEventDestroy(started_));
+  }
+
+  void Start() { RequireCudaSuccess(cudaEventRecord(started_), "CUDA timing event record"); }
+
+  [[nodiscard]] double StopMilliseconds() {
+    RequireCudaSuccess(cudaEventRecord(finished_), "CUDA timing event record");
+    RequireCudaSuccess(cudaEventSynchronize(finished_), "CUDA timing event synchronization");
+    float milliseconds = 0.0F;
+    RequireCudaSuccess(cudaEventElapsedTime(&milliseconds, started_, finished_),
+                       "CUDA elapsed time query");
+    return static_cast<double>(milliseconds);
+  }
+
+ private:
+  cudaEvent_t started_ = nullptr;
+  cudaEvent_t finished_ = nullptr;
+};
+
+void ObserveCudaMemory(const std::uint64_t baseline_free_bytes, std::uint64_t& current_device_bytes,
+                       std::uint64_t& peak_device_bytes) {
+  std::size_t free_bytes = 0U;
+  std::size_t total_bytes = 0U;
+  RequireCudaSuccess(cudaMemGetInfo(&free_bytes, &total_bytes), "CUDA memory query");
+  const std::uint64_t observed_free = static_cast<std::uint64_t>(free_bytes);
+  current_device_bytes =
+      baseline_free_bytes > observed_free ? baseline_free_bytes - observed_free : 0U;
+  peak_device_bytes = std::max(peak_device_bytes, current_device_bytes);
+}
+
 template <typename Element>
 void AppendDeviceInput(Ort::Allocator& allocator, Ort::MemoryInfo& memory,
                        const std::vector<Element>& source, const std::vector<std::int64_t>& shape,
@@ -806,25 +858,36 @@ struct BoundHostOutputs {
     const std::vector<std::int64_t>& image_shape, const std::vector<std::int64_t>& valid_shape,
     const std::vector<std::int64_t>& intrinsic_shape,
     const std::vector<std::int64_t>& transform_shape, const std::vector<std::int64_t>& ego_shape,
-    const std::vector<std::int64_t>& temporal_shape) {
+    const std::vector<std::int64_t>& temporal_shape, RuntimePhaseTiming& timing,
+    const std::uint64_t baseline_free_device_bytes, std::uint64_t& current_device_bytes,
+    std::uint64_t& peak_device_bytes, const bool track_device_memory) {
   Ort::MemoryInfo gpu_memory("Cuda", OrtDeviceAllocator, device_id, OrtMemTypeDefault);
   Ort::Allocator gpu_allocator(session, gpu_memory);
   std::vector<Ort::MemoryAllocation> input_allocations;
   std::vector<Ort::Value> input_values;
   input_allocations.reserve(InputSpecs().size());
   input_values.reserve(InputSpecs().size());
-  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.images, image_shape,
-                    ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
-  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.camera_valid, valid_shape,
-                    ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL, input_allocations, input_values);
-  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.intrinsics, intrinsic_shape,
-                    ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
-  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.t_vehicle_camera, transform_shape,
-                    ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
-  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.ego_motion_previous_to_current, ego_shape,
-                    ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
-  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.temporal_valid, temporal_shape,
-                    ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL, input_allocations, input_values);
+  {
+    const NvtxRange range("host-to-device");
+    CudaEventTimer timer;
+    timer.Start();
+    AppendDeviceInput(gpu_allocator, gpu_memory, inputs.images, image_shape,
+                      ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
+    AppendDeviceInput(gpu_allocator, gpu_memory, inputs.camera_valid, valid_shape,
+                      ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL, input_allocations, input_values);
+    AppendDeviceInput(gpu_allocator, gpu_memory, inputs.intrinsics, intrinsic_shape,
+                      ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
+    AppendDeviceInput(gpu_allocator, gpu_memory, inputs.t_vehicle_camera, transform_shape,
+                      ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
+    AppendDeviceInput(gpu_allocator, gpu_memory, inputs.ego_motion_previous_to_current, ego_shape,
+                      ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
+    AppendDeviceInput(gpu_allocator, gpu_memory, inputs.temporal_valid, temporal_shape,
+                      ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL, input_allocations, input_values);
+    timing.host_to_device_ms = timer.StopMilliseconds();
+    if (track_device_memory) {
+      ObserveCudaMemory(baseline_free_device_bytes, current_device_bytes, peak_device_bytes);
+    }
+  }
 
   Ort::IoBinding binding(session);
   for (std::size_t index = 0; index < InputSpecs().size(); ++index) {
@@ -833,31 +896,49 @@ struct BoundHostOutputs {
   for (const TensorSpec& spec : OutputSpecs()) {
     binding.BindOutput(spec.name.data(), gpu_memory);
   }
-  binding.SynchronizeInputs();
-  session.Run(Ort::RunOptions{nullptr}, binding);
-  binding.SynchronizeOutputs();
+  {
+    const NvtxRange range("inference");
+    CudaEventTimer timer;
+    timer.Start();
+    binding.SynchronizeInputs();
+    session.Run(Ort::RunOptions{nullptr}, binding);
+    binding.SynchronizeOutputs();
+    timing.inference_ms = timer.StopMilliseconds();
+  }
   std::vector<Ort::Value> device_outputs = binding.GetOutputValues();
   if (device_outputs.size() != OutputSpecs().size()) {
     throw RuntimeError("RUNTIME_OUTPUT_COUNT",
                        "I/O binding output count differs from the contract");
   }
+  if (track_device_memory) {
+    ObserveCudaMemory(baseline_free_device_bytes, current_device_bytes, peak_device_bytes);
+  }
   BoundHostOutputs result;
   result.storage.reserve(device_outputs.size());
   result.values.reserve(device_outputs.size());
   Ort::MemoryInfo cpu_memory = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-  for (std::size_t index = 0; index < device_outputs.size(); ++index) {
-    const auto type_and_shape = device_outputs[index].GetTensorTypeAndShapeInfo();
-    if (type_and_shape.GetElementType() != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
-      throw RuntimeError("RUNTIME_OUTPUT_TYPE", "bound output is not float32");
+  {
+    const NvtxRange range("device-to-host");
+    CudaEventTimer timer;
+    timer.Start();
+    for (std::size_t index = 0; index < device_outputs.size(); ++index) {
+      const auto type_and_shape = device_outputs[index].GetTensorTypeAndShapeInfo();
+      if (type_and_shape.GetElementType() != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
+        throw RuntimeError("RUNTIME_OUTPUT_TYPE", "bound output is not float32");
+      }
+      const std::size_t count = type_and_shape.GetElementCount();
+      result.storage.emplace_back(count);
+      RequireCudaSuccess(
+          cudaMemcpy(result.storage.back().data(), device_outputs[index].GetTensorData<float>(),
+                     count * sizeof(float), cudaMemcpyDeviceToHost),
+          "synchronous device-to-host output copy");
+      const std::vector<std::int64_t> shape = type_and_shape.GetShape();
+      result.values.emplace_back(MakeTensor(cpu_memory, result.storage.back(), shape));
     }
-    const std::size_t count = type_and_shape.GetElementCount();
-    result.storage.emplace_back(count);
-    RequireCudaSuccess(
-        cudaMemcpy(result.storage.back().data(), device_outputs[index].GetTensorData<float>(),
-                   count * sizeof(float), cudaMemcpyDeviceToHost),
-        "synchronous device-to-host output copy");
-    const std::vector<std::int64_t> shape = type_and_shape.GetShape();
-    result.values.emplace_back(MakeTensor(cpu_memory, result.storage.back(), shape));
+    timing.device_to_host_ms = timer.StopMilliseconds();
+    if (track_device_memory) {
+      ObserveCudaMemory(baseline_free_device_bytes, current_device_bytes, peak_device_bytes);
+    }
   }
   return result;
 }
@@ -879,9 +960,23 @@ class CpuRuntime::Impl final {
     session_options.SetInterOpNumThreads(1);
     session_options.SetLogSeverityLevel(0);
     Ort::ThrowOnError(Ort::GetApi().SetSessionLogVerbosityLevel(session_options, 4));
+    if (!options.onnx_profile_prefix.empty()) {
+      if (!options.onnx_profile_prefix.parent_path().empty()) {
+        std::filesystem::create_directories(options.onnx_profile_prefix.parent_path());
+      }
+      session_options.EnableProfiling(options.onnx_profile_prefix.c_str());
+    }
     const std::vector<std::string> available_providers = Ort::GetAvailableProviders();
     cache_directory = PrepareProviderCache(model_sha256, options.provider);
     ConfigureProviders(session_options, options.provider, available_providers, cache_directory);
+#if defined(JUNCTIONLENS_ENABLE_CUDA_RUNTIME)
+    if (options.provider.profile != ExecutionProviderProfile::kCpuReference) {
+      std::size_t free_bytes = 0U;
+      std::size_t total_bytes = 0U;
+      RequireCudaSuccess(cudaMemGetInfo(&free_bytes, &total_bytes), "CUDA baseline memory query");
+      baseline_free_device_bytes = static_cast<std::uint64_t>(free_bytes);
+    }
+#endif
     session =
         std::make_unique<Ort::Session>(environment, options.model_path.c_str(), session_options);
     ValidateTensorContract(*session, true);
@@ -915,6 +1010,15 @@ class CpuRuntime::Impl final {
       diagnostics.gpu_compute_capability_major = properties.major;
       diagnostics.gpu_compute_capability_minor = properties.minor;
       diagnostics.gpu_memory_bytes = static_cast<std::uint64_t>(properties.totalGlobalMem);
+      UpdateDeviceMemoryHighWater();
+    }
+#endif
+  }
+
+  void UpdateDeviceMemoryHighWater() const {
+#if defined(JUNCTIONLENS_ENABLE_CUDA_RUNTIME)
+    if (options.provider.profile != ExecutionProviderProfile::kCpuReference) {
+      ObserveCudaMemory(baseline_free_device_bytes, current_device_bytes, peak_device_bytes);
     }
 #endif
   }
@@ -927,6 +1031,10 @@ class CpuRuntime::Impl final {
   std::filesystem::path cache_directory;
   std::unique_ptr<Ort::Session> session;
   RuntimeDiagnostics diagnostics;
+  std::uint64_t baseline_free_device_bytes = 0U;
+  mutable std::uint64_t current_device_bytes = 0U;
+  mutable std::uint64_t peak_device_bytes = 0U;
+  bool track_device_memory = false;
 };
 
 CpuRuntime::CpuRuntime(RuntimeOptions options)
@@ -939,7 +1047,9 @@ CpuRuntime& CpuRuntime::operator=(CpuRuntime&&) noexcept = default;
 CpuRuntime::~CpuRuntime() = default;
 
 v1::SceneControlGraphEnvelope CpuRuntime::Infer(const PreprocessedInputs& inputs,
-                                                BufferLease& lease) const {
+                                                BufferLease& lease,
+                                                RuntimePhaseTiming* timing) const {
+  RuntimePhaseTiming measured = inputs.timing;
   constexpr std::size_t kExpectedImageValues = 2U * 8U * 3U * 384U * 640U;
   if (inputs.images.size() != kExpectedImageValues || inputs.camera_valid.size() != 16U ||
       inputs.intrinsics.size() != 144U || inputs.t_vehicle_camera.size() != 256U ||
@@ -971,9 +1081,15 @@ v1::SceneControlGraphEnvelope CpuRuntime::Infer(const PreprocessedInputs& inputs
     for (const TensorSpec& spec : OutputSpecs()) {
       output_names.push_back(spec.name.data());
     }
-    const std::vector<Ort::Value> outputs =
-        impl_->session->Run(Ort::RunOptions{nullptr}, input_names.data(), input_values.data(),
-                            input_values.size(), output_names.data(), output_names.size());
+    const std::uint64_t inference_started = MonotonicNowNanoseconds();
+    std::vector<Ort::Value> outputs;
+    {
+      const NvtxRange inference_range("inference");
+      outputs =
+          impl_->session->Run(Ort::RunOptions{nullptr}, input_names.data(), input_values.data(),
+                              input_values.size(), output_names.data(), output_names.size());
+    }
+    measured.inference_ms = ElapsedMilliseconds(inference_started, MonotonicNowNanoseconds());
     if (outputs.size() != OutputSpecs().size()) {
       throw RuntimeError("RUNTIME_OUTPUT_COUNT", "runtime output count differs from the contract");
     }
@@ -981,27 +1097,76 @@ v1::SceneControlGraphEnvelope CpuRuntime::Infer(const PreprocessedInputs& inputs
       static_cast<void>(View(outputs, index));
     }
     lease.Advance(BufferState::kPostprocessing);
-    return Postprocess(outputs, inputs, impl_->options, impl_->model_sha256,
-                       impl_->diagnostics.provider_assignment);
+    const std::uint64_t postprocess_started = MonotonicNowNanoseconds();
+    v1::SceneControlGraphEnvelope result;
+    {
+      const NvtxRange postprocess_range("postprocess");
+      result = Postprocess(outputs, inputs, impl_->options, impl_->model_sha256,
+                           impl_->diagnostics.provider_assignment);
+    }
+    measured.postprocess_ms = ElapsedMilliseconds(postprocess_started, MonotonicNowNanoseconds());
+    impl_->UpdateDeviceMemoryHighWater();
+    if (timing != nullptr) {
+      *timing = measured;
+    }
+    return result;
   }
 #if !defined(JUNCTIONLENS_ENABLE_CUDA_RUNTIME)
   throw RuntimeError("RUNTIME_ACCELERATED_BUILD_REQUIRED",
                      "accelerated inference requires the GPU artifact");
 #else
-  BoundHostOutputs outputs = RunWithDeviceBinding(
-      *impl_->session, inputs, impl_->options.provider.device_id, image_shape, valid_shape,
-      intrinsic_shape, transform_shape, ego_shape, temporal_shape);
+  BoundHostOutputs outputs =
+      RunWithDeviceBinding(*impl_->session, inputs, impl_->options.provider.device_id, image_shape,
+                           valid_shape, intrinsic_shape, transform_shape, ego_shape, temporal_shape,
+                           measured, impl_->baseline_free_device_bytes, impl_->current_device_bytes,
+                           impl_->peak_device_bytes, impl_->track_device_memory);
   for (std::size_t index = 0; index < outputs.values.size(); ++index) {
     static_cast<void>(View(outputs.values, index));
   }
   lease.Advance(BufferState::kPostprocessing);
-  return Postprocess(outputs.values, inputs, impl_->options, impl_->model_sha256,
-                     impl_->diagnostics.provider_assignment);
+  const std::uint64_t postprocess_started = MonotonicNowNanoseconds();
+  v1::SceneControlGraphEnvelope result;
+  {
+    const NvtxRange postprocess_range("postprocess");
+    result = Postprocess(outputs.values, inputs, impl_->options, impl_->model_sha256,
+                         impl_->diagnostics.provider_assignment);
+  }
+  measured.postprocess_ms = ElapsedMilliseconds(postprocess_started, MonotonicNowNanoseconds());
+  impl_->UpdateDeviceMemoryHighWater();
+  if (timing != nullptr) {
+    *timing = measured;
+  }
+  return result;
 #endif
 }
 
 const RuntimeOptions& CpuRuntime::options() const noexcept { return impl_->options; }
 
 const RuntimeDiagnostics& CpuRuntime::diagnostics() const noexcept { return impl_->diagnostics; }
+
+RuntimeMemoryHighWater CpuRuntime::memory_high_water() const {
+  impl_->UpdateDeviceMemoryHighWater();
+  return {
+      PeakResidentHostBytes(),
+      impl_->current_device_bytes,
+      impl_->peak_device_bytes,
+  };
+}
+
+void CpuRuntime::SetDeviceMemoryTracking(const bool enabled) noexcept {
+  impl_->track_device_memory = enabled;
+}
+
+std::filesystem::path CpuRuntime::EndProfiling() {
+  if (impl_->options.onnx_profile_prefix.empty()) {
+    return {};
+  }
+  Ort::AllocatorWithDefaultOptions allocator;
+  auto path = impl_->session->EndProfilingAllocated(allocator);
+  if (path.get() == nullptr || std::string_view(path.get()).empty()) {
+    throw RuntimeError("RUNTIME_PROFILE_OUTPUT", "ONNX Runtime returned no profiling path");
+  }
+  return std::filesystem::path(path.get());
+}
 
 }  // namespace junctionlens::infer

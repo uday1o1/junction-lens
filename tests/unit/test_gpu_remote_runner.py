@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 from scripts.gpu.remote_runner import PhaseResult, Runner
@@ -69,6 +70,22 @@ def test_remote_config_is_derived_from_verified_source_manifest(tmp_path: Path) 
     assert json.loads(config_path.read_text(encoding="utf-8")) == value
 
 
+def test_runtime_performance_profile_is_distinct_from_cuda_correctness(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[2]
+    manifest_path = tmp_path / "manifest.json"
+    create_bundle(root, tmp_path / "source.tar", manifest_path, require_clean=False)
+    value = create_remote_config(
+        manifest_path,
+        tmp_path / "config.json",
+        profile="runtime-performance",
+        remote_data_root=None,
+        gpu_uuid="GPU-1234",
+    )
+    assert value["profile"] == "runtime-performance"
+    performance = Runner(root, tmp_path / "results", value)
+    assert performance.profile == "runtime-performance"
+
+
 def test_public_handoff_requires_one_explicit_host_prerequisite() -> None:
     root = Path(__file__).resolve().parents[2]
     environment = os.environ.copy()
@@ -84,3 +101,14 @@ def test_public_handoff_requires_one_explicit_host_prerequisite() -> None:
     )
     assert completed.returncode != 0
     assert "Set JUNCTIONLENS_GPU_HOST to an SSH alias" in completed.stderr
+
+
+def test_infrastructure_exit_is_recorded_as_blocked(tmp_path: Path) -> None:
+    runner = _runner(tmp_path)
+    result = runner.run_command(
+        "contaminated-benchmark",
+        [sys.executable, "-c", "raise SystemExit(3)"],
+        blocked_return_codes=frozenset({3}),
+    )
+    assert result.status == "BLOCKED"
+    assert result.reason_code == "PHASE_COMMAND_BLOCKED_INFRASTRUCTURE"

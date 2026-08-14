@@ -5,7 +5,7 @@ JL_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 JL_PROFILE=runtime-cuda
 
 usage() {
-  echo "Usage: ./scripts/gpu/qualify_remote.sh [--profile m0.3|runtime-cuda|core|full-v1]" >&2
+  echo "Usage: ./scripts/gpu/qualify_remote.sh [--profile m0.3|runtime-cuda|runtime-performance|core|full-v1]" >&2
 }
 
 while [ "$#" -gt 0 ]; do
@@ -27,7 +27,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$JL_PROFILE" in
-  m0.3|runtime-cuda|core|full-v1) ;;
+  m0.3|runtime-cuda|runtime-performance|core|full-v1) ;;
   *) echo "Invalid qualification profile: $JL_PROFILE" >&2; exit 2 ;;
 esac
 

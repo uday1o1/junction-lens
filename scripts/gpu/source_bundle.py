@@ -296,7 +296,7 @@ def create_remote_config(
     gpu_uuid: str | None,
 ) -> dict[str, Any]:
     """Create the non-secret configuration consumed by the remote runner."""
-    if profile not in {"m0.3", "runtime-cuda", "core", "full-v1"}:
+    if profile not in {"m0.3", "runtime-cuda", "runtime-performance", "core", "full-v1"}:
         raise SourceBundleError("remote qualification profile is invalid")
     manifest = _load_manifest(manifest_path)
     value = {

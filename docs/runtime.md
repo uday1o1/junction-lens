@@ -111,3 +111,39 @@ The local accelerated implementation gate is:
 
 This command proves the exact parser fixtures, fallback rejection, partial TensorRT reporting, cache invalidation, secure source synchronization, public CPU control path, formatting, linting, type checking, native tests, and inherited correctness gates.
 It does not claim CUDA correctness, performance, or TensorRT coverage on macOS.
+
+## Performance and stability evidence
+
+Milestone 8.3 adds a native `junctionlens-runtime benchmark` path that runs the same validated model, preprocessing, inference, postprocessing, tracking-state update, and protobuf serialization code as batch inference.
+It emits separate warmup, measured, and stability populations without writing prediction files into the timed path.
+The `predecoded` profile measures input-ready to serialized-graph-ready latency and reports full-file image decoding separately.
+The `full-file` profile includes protobuf input, image digest verification, decode, resize, normalize, and pack work in end-to-end latency.
+
+Linux host timing uses `CLOCK_MONOTONIC_RAW`.
+CUDA host-to-device, inference, and device-to-host phases use CUDA events at the declared synchronous ownership boundaries.
+The native report includes decode, preprocess, transfer, inference, postprocess, tracking-state, serialization, end-to-end, startup, throughput inputs, peak resident host memory, current device memory, peak device memory, and provider node counts.
+
+The exact target protocol is in `configs/runtime/qualification-v1.yaml`.
+It requires 200 warmup frames, 2,000 measured frames, and a separate 10,000-frame stability run.
+The analyzer reports count, mean, median, P90, P95, P99, and maximum for every phase, and computes throughput only from measured end-to-end samples.
+Memory acceptance checks both final growth and a least-squares positive growth slope over stability samples.
+Transient CUDA allocation observations run only during the separate stability population, so memory-query overhead is never included in the release latency distribution.
+
+GPU qualification samples temperature, utilization, device memory, graphics and memory clocks, power, throttle reasons, performance state, ECC state, Xid messages, and competing compute processes.
+A temperature, clock, throttle, power, contention, Xid, or unavailable Xid-audit failure produces `BLOCKED_INFRASTRUCTURE` instead of a performance result.
+Absolute acceptance still requires at least 10 graphs per second, P95 at most 100 milliseconds, P99 at most 125 milliseconds, peak device memory at most 6 GiB, no unexpected CPU provider nodes, and bounded memory growth.
+
+NVTX ranges identify decode, preprocess, host-to-device transfer, inference, device-to-host transfer, postprocess, tracking-state, and serialization work.
+The profiler command records one bounded Nsight Systems trace with only CUDA and NVTX tracing plus one ONNX Runtime profile.
+Profiler reports are marked `publishable: false`, and the qualification analyzer rejects them if supplied as benchmark evidence.
+Nsight Compute is not run automatically because V1 has no confirmed custom hot kernel that the project can interpret.
+
+The local implementation gate is:
+
+```sh
+./tools/jl verify-m8-3-local
+```
+
+This local gate exercises the native benchmark on a real exported model, seeded leak and contention failures, clean controls, strict evidence parsing, formatting, linting, type checking, sanitizer tests, and every inherited gate.
+It does not claim the absolute GPU budgets on macOS.
+Those target-only gates remain `DEFERRED_HARDWARE` until the `runtime-performance` remote profile passes.

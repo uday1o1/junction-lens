@@ -14,6 +14,8 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "junctionlens/infer/instrumentation.hpp"
+
 namespace junctionlens::infer {
 namespace {
 
@@ -307,15 +309,21 @@ PreprocessedInputs Preprocess(const v1::SensorFrame* previous, const v1::SensorF
   const v1::SensorFrame& first = temporal_valid ? *previous : current;
   const std::array<const v1::SensorFrame*, kTimestampCount> frames = {&first, &current};
   std::array<std::array<cv::Mat, kCameraCount>, kTimestampCount> decoded;
-  for (int timestamp = 0; timestamp < kTimestampCount; ++timestamp) {
-    for (int camera_index = 0; camera_index < kCameraCount; ++camera_index) {
-      const auto& camera = frames[static_cast<std::size_t>(timestamp)]->cameras(camera_index);
-      if (camera.valid()) {
-        decoded[static_cast<std::size_t>(timestamp)][static_cast<std::size_t>(camera_index)] =
-            DecodeCamera(camera, asset_root);
+  const std::uint64_t decode_started = MonotonicNowNanoseconds();
+  {
+    const NvtxRange range("decode");
+    for (int timestamp = 0; timestamp < kTimestampCount; ++timestamp) {
+      for (int camera_index = 0; camera_index < kCameraCount; ++camera_index) {
+        const auto& camera = frames[static_cast<std::size_t>(timestamp)]->cameras(camera_index);
+        if (camera.valid()) {
+          decoded[static_cast<std::size_t>(timestamp)][static_cast<std::size_t>(camera_index)] =
+              DecodeCamera(camera, asset_root);
+        }
       }
     }
   }
+  const std::uint64_t preprocess_started = MonotonicNowNanoseconds();
+  const NvtxRange preprocess_range("preprocess");
   lease.Advance(BufferState::kPreprocessing);
   PreprocessedInputs result{
       std::vector<float>(static_cast<std::size_t>(kTimestampCount * kCameraCount * kChannels *
@@ -327,7 +335,9 @@ PreprocessedInputs Preprocess(const v1::SensorFrame* previous, const v1::SensorF
       std::vector<float>(16U, 0.0F),
       std::vector<std::uint8_t>(1U, temporal_valid ? 1U : 0U),
       current,
+      RuntimePhaseTiming{},
   };
+  result.timing.decode_ms = ElapsedMilliseconds(decode_started, preprocess_started);
   for (int timestamp = 0; timestamp < kTimestampCount; ++timestamp) {
     for (int camera_index = 0; camera_index < kCameraCount; ++camera_index) {
       const auto& camera = frames[static_cast<std::size_t>(timestamp)]->cameras(camera_index);
@@ -357,6 +367,7 @@ PreprocessedInputs Preprocess(const v1::SensorFrame* previous, const v1::SensorF
           ego_motion(row, column);
     }
   }
+  result.timing.preprocess_ms = ElapsedMilliseconds(preprocess_started, MonotonicNowNanoseconds());
   return result;
 }
 

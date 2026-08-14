@@ -107,7 +107,8 @@ def _input_envelope(
     return envelope
 
 
-def _write_fixture(root: Path) -> Path:
+def write_synthetic_runtime_fixture(root: Path) -> Path:
+    """Write the repository-owned two-frame runtime qualification fixture."""
     image = root / "images" / "frame.png"
     image.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (100, 80), color=(20, 30, 40)).save(image)
@@ -244,7 +245,7 @@ def qualify(arguments: argparse.Namespace) -> dict[str, Any]:
     work.mkdir(parents=True, exist_ok=False)
     fixture = work / "fixture"
     fixture.mkdir()
-    input_list = _write_fixture(fixture)
+    input_list = write_synthetic_runtime_fixture(fixture)
     common = {
         "model_path": arguments.model.resolve(),
         "profile_path": arguments.profile.resolve(),

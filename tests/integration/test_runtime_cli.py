@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,9 @@ from typer.testing import CliRunner
 
 from junctionlens.cli.main import app
 from junctionlens.contract.validation import validate_envelope
+from junctionlens.model.profile import load_m0_profile
 from junctionlens.model.spike import INPUT_NAMES, OUTPUT_NAMES
+from junctionlens.runtime.benchmark import analyze_native_benchmark, load_runtime_qualification
 from junctionlens.runtime.reference import reference_postprocess
 from junctionlens.v1 import scene_control_graph_pb2 as scg
 
@@ -170,6 +173,51 @@ def _invoke(
     )
 
 
+def _benchmark_command(
+    *,
+    model_path: Path,
+    input_list: Path,
+    asset_root: Path,
+    raw: Path,
+    runtime: Path,
+    warmup: int,
+    measured: int,
+    stability: int,
+    input_profile: str,
+) -> list[str]:
+    profile = load_m0_profile(Path("configs/model/m0-spike.yaml"))
+    return [
+        str(runtime),
+        "benchmark",
+        "--model",
+        str(model_path),
+        "--expected-profile-sha256",
+        profile.canonical_sha256(),
+        "--input-list",
+        str(input_list),
+        "--asset-root",
+        str(asset_root),
+        "--timing-output",
+        str(raw),
+        "--git-commit",
+        "1" * 40,
+        "--configuration-sha256",
+        profile.canonical_sha256(),
+        "--runtime-build-sha256",
+        _sha256(runtime),
+        "--warmup-frames",
+        str(warmup),
+        "--measured-frames",
+        str(measured),
+        "--stability-frames",
+        str(stability),
+        "--memory-sample-period",
+        "1",
+        "--input-profile",
+        input_profile,
+    ]
+
+
 def _assert_logical_parity(actual: Message, expected: Message, path: str = "graph") -> None:
     actual_fields = {field.number: (field, value) for field, value in actual.ListFields()}
     expected_fields = {field.number: (field, value) for field, value in expected.ListFields()}
@@ -258,6 +306,84 @@ def test_malformed_protobuf_fails_without_partial_output(
     assert result.exit_code == 2
     assert "RUNTIME_INPUT_CONTRACT" in result.output
     assert not tuple(output.glob("*"))
+
+
+def test_native_benchmark_exercises_full_serialized_path(
+    exported_m0_model: tuple[Path, Path], tmp_path: Path
+) -> None:
+    _, model_path = exported_m0_model
+    input_list, _ = _write_batch(tmp_path)
+    raw = tmp_path / "benchmark-raw.json"
+    runtime = Path("build/cpu/bin/junctionlens-runtime").resolve()
+    completed = subprocess.run(
+        _benchmark_command(
+            model_path=model_path,
+            input_list=input_list,
+            asset_root=tmp_path,
+            raw=raw,
+            runtime=runtime,
+            warmup=1,
+            measured=2,
+            stability=2,
+            input_profile="full-file",
+        ),
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stderr
+    receipt = json.loads(completed.stdout)
+    assert receipt["schema_version"] == "junctionlens.runtime-benchmark-receipt.v1"
+    report = analyze_native_benchmark(
+        raw,
+        load_runtime_qualification(Path("configs/runtime/qualification-v1.yaml")),
+        qualification_environment=False,
+    )
+    assert report["status"] == "LOCAL_DIAGNOSTIC"
+    assert report["clock_source"] in {"CLOCK_MONOTONIC_RAW", "std::chrono::steady_clock"}
+    assert report["distributions"]["end_to_end_ms"]["measured"]["count"] == 2
+    assert report["distributions"]["decode_ms"]["measured"]["mean_ms"] > 0.0
+    assert report["distributions"]["preprocess_ms"]["measured"]["mean_ms"] > 0.0
+    assert report["memory"]["peak_resident_host_bytes"] > 0
+    assert report["protocol_complete"] is False
+
+
+def test_native_profiler_run_is_marked_nonpublishable(
+    exported_m0_model: tuple[Path, Path], tmp_path: Path
+) -> None:
+    _, model_path = exported_m0_model
+    input_list, _ = _write_batch(tmp_path)
+    runtime = Path("build/cpu/bin/junctionlens-runtime").resolve()
+    raw = tmp_path / "profiler-raw.json"
+    profile_prefix = tmp_path / "onnx-profile"
+    command = _benchmark_command(
+        model_path=model_path,
+        input_list=input_list,
+        asset_root=tmp_path,
+        raw=raw,
+        runtime=runtime,
+        warmup=1,
+        measured=1,
+        stability=0,
+        input_profile="predecoded",
+    )
+    command.extend(["--profiler-run", "--onnx-profile-prefix", str(profile_prefix)])
+    completed = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(raw.read_text(encoding="utf-8"))
+    assert payload["profiler_run"] is True
+    assert payload["publishable"] is False
+    assert payload["onnx_profile_file"]
+    profile_paths = tuple(tmp_path.glob("onnx-profile*.json"))
+    assert len(profile_paths) == 1
+    assert profile_paths[0].stat().st_size > 0
 
 
 def test_wrong_image_digest_fails_closed(

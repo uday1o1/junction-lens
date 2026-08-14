@@ -112,7 +112,13 @@ class Runner:
         self.source_digest = str(config["source_content_sha256"])
         self.source_commit = str(config["source_commit"])
         self.profile = str(config["profile"])
-        if self.profile not in {"m0.3", "runtime-cuda", "core", "full-v1"}:
+        if self.profile not in {
+            "m0.3",
+            "runtime-cuda",
+            "runtime-performance",
+            "core",
+            "full-v1",
+        }:
             raise QualificationError("qualification profile is invalid")
         data_root_value = config.get("remote_data_root")
         self.data_root = Path(str(data_root_value)).resolve() if data_root_value else None
@@ -195,6 +201,7 @@ class Runner:
         required: bool = True,
         environment: dict[str, str] | None = None,
         timeout: int = 14_400,
+        blocked_return_codes: frozenset[int] = frozenset(),
     ) -> PhaseResult:
         input_sha256 = self._phase_input_sha256(name, command)
         reused = self._reuse(name, input_sha256, required)
@@ -254,9 +261,18 @@ class Runner:
             commands.write(json.dumps(command_record, sort_keys=True, allow_nan=False) + "\n")
             commands.flush()
             os.fsync(commands.fileno())
+        status = (
+            "PASSED"
+            if return_code == 0
+            else "BLOCKED"
+            if return_code in blocked_return_codes
+            else "FAILED"
+        )
+        if status == "BLOCKED":
+            reason_code = "PHASE_COMMAND_BLOCKED_INFRASTRUCTURE"
         return self.record_phase(
             name,
-            status="PASSED" if return_code == 0 else "FAILED",
+            status=status,
             reason_code=reason_code,
             required=required,
             input_sha256=input_sha256,
@@ -383,16 +399,29 @@ class Runner:
             failures.append("PREFLIGHT_DISK_SPACE_LOW")
         if free_inodes < MINIMUM_INODES:
             failures.append("PREFLIGHT_INODES_LOW")
-        competing = []
+        competing: list[dict[str, Any]] = []
         if nvidia_smi is not None:
             processes = _run_probe(
                 [
                     nvidia_smi,
-                    "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+                    "--query-compute-apps=gpu_uuid,pid,process_name,used_gpu_memory",
                     "--format=csv,noheader,nounits",
                 ]
             )
-            competing = [line.strip() for line in processes.stdout.splitlines() if line.strip()]
+            if processes.returncode != 0:
+                failures.append("PREFLIGHT_COMPUTE_PROCESS_QUERY_FAILED")
+            else:
+                for line in processes.stdout.splitlines():
+                    values = [value.strip() for value in line.split(",")]
+                    if len(values) == 4:
+                        competing.append(
+                            {
+                                "gpu_uuid": values[0],
+                                "pid": values[1],
+                                "process_name_sha256": _sha256_bytes(values[2].encode()),
+                                "used_gpu_memory_mib": values[3],
+                            }
+                        )
         tools: dict[str, str] = {}
         for name, command in {
             "gcc": ["gcc", "--version"],
@@ -402,12 +431,15 @@ class Runner:
             "python": [sys.executable, "--version"],
             "node": ["node", "--version"],
             "docker": ["docker", "--version"],
+            "nsys": ["nsys", "--version"],
         }.items():
             if shutil.which(command[0]) is None:
                 tools[name] = "ABSENT"
             else:
                 probe = _run_probe(command)
                 tools[name] = (probe.stdout + probe.stderr).splitlines()[0].strip()
+        if self.profile in {"runtime-performance", "core", "full-v1"} and tools["nsys"] == "ABSENT":
+            failures.append("PREFLIGHT_NSYS_REQUIRED")
         self.environment = {
             "schema_version": SCHEMA_VERSION,
             "host": {
@@ -483,10 +515,11 @@ class Runner:
                 f"{missing}\n",
                 encoding="utf-8",
             )
-        (self.result_root / "benchmarks.json").write_text(
-            '{"schema_version":"junctionlens.benchmarks.v1","status":"DEFERRED_TO_M8_3"}\n',
-            encoding="utf-8",
-        )
+        if not (self.result_root / "benchmarks.json").exists():
+            (self.result_root / "benchmarks.json").write_text(
+                '{"schema_version":"junctionlens.benchmarks.v1","status":"DEFERRED_TO_M8_3"}\n',
+                encoding="utf-8",
+            )
         self._write_junit(phases)
         report_lines = [
             "# Remote qualification report",
@@ -749,6 +782,80 @@ def run(root: Path, result_root: Path, config: dict[str, Any]) -> str:
             else runner.blocked_phase("06-cuda-parity", "BLOCKED_BY_PROVIDER_AUDIT")
         )
         phases.append(parity)
+        if runner.profile in {"runtime-performance", "core", "full-v1"}:
+            performance_root = runner.result_root / "performance"
+            performance = (
+                runner.run_command(
+                    "13-accelerated-performance",
+                    [
+                        "./.venv/bin/python",
+                        "-m",
+                        "scripts.gpu.benchmark_runtime",
+                        "--model",
+                        "artifacts/m0/model-spike/model.onnx",
+                        "--profile",
+                        "configs/model/m0-spike.yaml",
+                        "--runtime",
+                        "build/gpu/bin/junctionlens-runtime",
+                        "--project-root",
+                        str(runner.root),
+                        "--source-commit",
+                        runner.source_commit,
+                        "--gpu-uuid",
+                        runner.selected_gpu_uuid,
+                        "--config",
+                        "configs/runtime/qualification-v1.yaml",
+                        "--output",
+                        str(performance_root),
+                    ],
+                    environment=common_environment,
+                    timeout=14_400,
+                    blocked_return_codes=frozenset({3}),
+                )
+                if parity.status == "PASSED"
+                else runner.blocked_phase("13-accelerated-performance", "BLOCKED_BY_CUDA_PARITY")
+            )
+            phases.append(performance)
+            if (
+                performance.status == "PASSED"
+                and (performance_root / "qualification.json").is_file()
+            ):
+                shutil.copyfile(
+                    performance_root / "qualification.json",
+                    runner.result_root / "benchmarks.json",
+                )
+            profiler_root = runner.result_root / "profiler"
+            profiler = (
+                runner.run_command(
+                    "14-profiler-automation",
+                    [
+                        "./.venv/bin/python",
+                        "-m",
+                        "scripts.gpu.profile_runtime",
+                        "--model",
+                        "artifacts/m0/model-spike/model.onnx",
+                        "--profile",
+                        "configs/model/m0-spike.yaml",
+                        "--runtime",
+                        "build/gpu/bin/junctionlens-runtime",
+                        "--project-root",
+                        str(runner.root),
+                        "--source-commit",
+                        runner.source_commit,
+                        "--gpu-uuid",
+                        runner.selected_gpu_uuid,
+                        "--config",
+                        "configs/runtime/qualification-v1.yaml",
+                        "--output",
+                        str(profiler_root),
+                    ],
+                    environment=common_environment,
+                    timeout=900,
+                )
+                if parity.status == "PASSED"
+                else runner.blocked_phase("14-profiler-automation", "BLOCKED_BY_CUDA_PARITY")
+            )
+            phases.append(profiler)
         tensorrt = runner.record_phase(
             "07-tensorrt-conditional",
             status="PASSED",

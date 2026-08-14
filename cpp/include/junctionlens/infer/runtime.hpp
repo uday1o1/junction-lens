@@ -133,6 +133,24 @@ struct RuntimeDiagnostics {
   std::uint64_t gpu_memory_bytes = 0U;
 };
 
+struct RuntimePhaseTiming {
+  double decode_ms = 0.0;
+  double preprocess_ms = 0.0;
+  double host_to_device_ms = 0.0;
+  double inference_ms = 0.0;
+  double device_to_host_ms = 0.0;
+  double postprocess_ms = 0.0;
+  double track_ms = 0.0;
+  double serialize_ms = 0.0;
+  double end_to_end_ms = 0.0;
+};
+
+struct RuntimeMemoryHighWater {
+  std::uint64_t peak_resident_host_bytes = 0U;
+  std::uint64_t current_device_bytes = 0U;
+  std::uint64_t peak_device_bytes = 0U;
+};
+
 struct RuntimeOptions {
   std::filesystem::path model_path;
   std::string expected_profile_sha256;
@@ -140,6 +158,7 @@ struct RuntimeOptions {
   double node_threshold = 0.5;
   double edge_threshold = 0.5;
   ProviderOptions provider;
+  std::filesystem::path onnx_profile_prefix;
 };
 
 struct PreprocessedInputs {
@@ -150,6 +169,7 @@ struct PreprocessedInputs {
   std::vector<float> ego_motion_previous_to_current;
   std::vector<std::uint8_t> temporal_valid;
   v1::SensorFrame output_sensor_frame;
+  RuntimePhaseTiming timing;
 };
 
 [[nodiscard]] PreprocessedInputs Preprocess(const v1::SensorFrame* previous,
@@ -167,9 +187,13 @@ class CpuRuntime final {
   ~CpuRuntime();
 
   [[nodiscard]] v1::SceneControlGraphEnvelope Infer(const PreprocessedInputs& inputs,
-                                                    BufferLease& lease) const;
+                                                    BufferLease& lease,
+                                                    RuntimePhaseTiming* timing = nullptr) const;
   [[nodiscard]] const RuntimeOptions& options() const noexcept;
   [[nodiscard]] const RuntimeDiagnostics& diagnostics() const noexcept;
+  [[nodiscard]] RuntimeMemoryHighWater memory_high_water() const;
+  void SetDeviceMemoryTracking(bool enabled) noexcept;
+  [[nodiscard]] std::filesystem::path EndProfiling();
 
  private:
   class Impl;

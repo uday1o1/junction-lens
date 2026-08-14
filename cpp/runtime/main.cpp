@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -19,6 +20,7 @@
 #include <vector>
 
 #include "contract/validation.hpp"
+#include "junctionlens/infer/instrumentation.hpp"
 
 namespace {
 
@@ -29,7 +31,9 @@ using junctionlens::infer::ExecutionProviderProfile;
 using junctionlens::infer::ProducerOptions;
 using junctionlens::infer::ProviderOptions;
 using junctionlens::infer::RuntimeError;
+using junctionlens::infer::RuntimeMemoryHighWater;
 using junctionlens::infer::RuntimeOptions;
+using junctionlens::infer::RuntimePhaseTiming;
 namespace v1 = junctionlens::v1;
 
 struct Arguments {
@@ -47,6 +51,14 @@ struct Arguments {
   std::size_t buffer_slots = 2U;
   ProviderOptions provider;
   std::filesystem::path provider_log_output;
+  std::filesystem::path timing_output;
+  std::size_t warmup_frames = 0U;
+  std::size_t measured_frames = 0U;
+  std::size_t stability_frames = 0U;
+  std::size_t memory_sample_period = 100U;
+  std::string input_profile = "full-file";
+  bool profiler_run = false;
+  std::filesystem::path onnx_profile_prefix;
 };
 
 [[nodiscard]] std::size_t ParseSize(const std::string& value, const std::string& label,
@@ -71,6 +83,12 @@ struct Arguments {
                "  junctionlens-runtime doctor --model PATH --expected-profile-sha256 HEX "
                "[--provider-profile cpu-reference|cuda|tensorrt] "
                "[--provider-log-output PATH] [provider options]\n"
+               "  junctionlens-runtime benchmark --model PATH --expected-profile-sha256 HEX "
+               "--input-list PATH --asset-root DIR --timing-output PATH --git-commit HEX "
+               "--configuration-sha256 HEX --runtime-build-sha256 HEX "
+               "--warmup-frames N --measured-frames N --stability-frames N "
+               "[--input-profile full-file|predecoded] [--memory-sample-period N] "
+               "[--profiler-run] [provider options]\n"
                "Provider options: --device-id N --provider-cache-root DIR "
                "--gpu-compute-capability TEXT --cuda-version TEXT "
                "--driver-compatibility-class TEXT --tensorrt-version TEXT\n";
@@ -94,8 +112,9 @@ struct Arguments {
   if (argc == 2 && std::string_view(argv[1]) == "--help") {
     PrintHelp();
   }
-  if (argc < 2 || (std::string_view(argv[1]) != "infer" && std::string_view(argv[1]) != "doctor")) {
-    throw std::invalid_argument("the runtime command must be 'infer' or 'doctor'");
+  if (argc < 2 || (std::string_view(argv[1]) != "infer" && std::string_view(argv[1]) != "doctor" &&
+                   std::string_view(argv[1]) != "benchmark")) {
+    throw std::invalid_argument("the runtime command must be 'infer', 'doctor', or 'benchmark'");
   }
   Arguments result;
   result.command = argv[1];
@@ -106,6 +125,10 @@ struct Arguments {
     }
     if (argument == "--git-dirty") {
       result.git_dirty = true;
+      continue;
+    }
+    if (argument == "--profiler-run") {
+      result.profiler_run = true;
       continue;
     }
     if (index + 1 >= argc) {
@@ -148,6 +171,20 @@ struct Arguments {
       result.provider.tensorrt_version = value;
     } else if (argument == "--provider-log-output") {
       result.provider_log_output = value;
+    } else if (argument == "--timing-output") {
+      result.timing_output = value;
+    } else if (argument == "--warmup-frames") {
+      result.warmup_frames = ParseSize(value, "warmup frames", 0U, 100000U);
+    } else if (argument == "--measured-frames") {
+      result.measured_frames = ParseSize(value, "measured frames", 1U, 100000U);
+    } else if (argument == "--stability-frames") {
+      result.stability_frames = ParseSize(value, "stability frames", 0U, 100000U);
+    } else if (argument == "--memory-sample-period") {
+      result.memory_sample_period = ParseSize(value, "memory sample period", 1U, 10000U);
+    } else if (argument == "--input-profile") {
+      result.input_profile = value;
+    } else if (argument == "--onnx-profile-prefix") {
+      result.onnx_profile_prefix = value;
     } else {
       throw std::invalid_argument("unknown argument: " + argument);
     }
@@ -160,6 +197,19 @@ struct Arguments {
        result.git_commit.empty() || result.configuration_sha256.empty() ||
        result.runtime_build_sha256.empty())) {
     throw std::invalid_argument("all documented infer arguments are required");
+  }
+  if (result.command == "benchmark" &&
+      (result.input_list.empty() || result.asset_root.empty() || result.timing_output.empty() ||
+       result.git_commit.empty() || result.configuration_sha256.empty() ||
+       result.runtime_build_sha256.empty() || result.measured_frames == 0U)) {
+    throw std::invalid_argument("all documented benchmark arguments are required");
+  }
+  if (result.input_profile != "full-file" && result.input_profile != "predecoded") {
+    throw std::invalid_argument("input profile must be full-file or predecoded");
+  }
+  if (!result.onnx_profile_prefix.empty() &&
+      (result.command != "benchmark" || !result.profiler_run)) {
+    throw std::invalid_argument("ONNX profiling is allowed only for explicit profiler runs");
   }
   if (result.command == "doctor") {
     result.git_commit = std::string(40U, '0');
@@ -232,6 +282,7 @@ struct Arguments {
       0.5,
       0.5,
       arguments.provider,
+      arguments.onnx_profile_prefix,
   };
 }
 
@@ -432,6 +483,76 @@ int RunDoctor(const Arguments& arguments) {
   return EXIT_SUCCESS;
 }
 
+struct BenchmarkSample {
+  std::size_t iteration;
+  std::string kind;
+  RuntimePhaseTiming timing;
+  RuntimeMemoryHighWater memory;
+};
+
+[[nodiscard]] std::string TimingJson(const RuntimePhaseTiming& timing) {
+  std::ostringstream output;
+  output << std::setprecision(17) << "{\"decode_ms\":" << timing.decode_ms
+         << ",\"preprocess_ms\":" << timing.preprocess_ms
+         << ",\"host_to_device_ms\":" << timing.host_to_device_ms
+         << ",\"inference_ms\":" << timing.inference_ms
+         << ",\"device_to_host_ms\":" << timing.device_to_host_ms
+         << ",\"postprocess_ms\":" << timing.postprocess_ms << ",\"track_ms\":" << timing.track_ms
+         << ",\"serialize_ms\":" << timing.serialize_ms
+         << ",\"end_to_end_ms\":" << timing.end_to_end_ms << '}';
+  return output.str();
+}
+
+void WriteBenchmarkReport(const Arguments& arguments, const CpuRuntime& runtime,
+                          const double startup_ms, const std::vector<BenchmarkSample>& samples,
+                          const std::size_t stability_processed,
+                          const std::filesystem::path& onnx_profile_path) {
+  const auto& diagnostics = runtime.diagnostics();
+  std::ostringstream output;
+  output << std::setprecision(17)
+         << "{\"schema_version\":\"junctionlens.runtime-benchmark-raw.v1\","
+            "\"status\":\"MEASURED_UNQUALIFIED\",\"publishable\":"
+         << (arguments.profiler_run ? "false" : "true")
+         << ",\"profiler_run\":" << (arguments.profiler_run ? "true" : "false")
+         << ",\"onnx_profile_file\":"
+         << (onnx_profile_path.empty() ? "null" : JsonString(onnx_profile_path.filename().string()))
+         << ",\"clock_source\":"
+         << JsonString(std::string(junctionlens::infer::MonotonicClockSource()))
+         << ",\"input_profile\":" << JsonString(arguments.input_profile) << ",\"provider_profile\":"
+         << JsonString(std::string(
+                junctionlens::infer::ExecutionProviderProfileName(arguments.provider.profile)))
+         << ",\"model_sha256\":" << JsonString(diagnostics.model_sha256)
+         << ",\"provider_assignment_sha256\":"
+         << JsonString(diagnostics.provider_assignment.canonical_sha256)
+         << ",\"provider_node_counts\":{";
+  std::size_t provider_index = 0U;
+  for (const auto& [provider, count] : diagnostics.provider_assignment.node_counts) {
+    if (provider_index++ != 0U) {
+      output << ',';
+    }
+    output << JsonString(provider) << ':' << count;
+  }
+  output << "},\"startup_ms\":" << startup_ms << ",\"warmup_frames\":" << arguments.warmup_frames
+         << ",\"measured_frames\":" << arguments.measured_frames
+         << ",\"stability_frames\":" << arguments.stability_frames
+         << ",\"stability_frames_processed\":" << stability_processed
+         << ",\"memory_sample_period\":" << arguments.memory_sample_period << ",\"samples\":[";
+  for (std::size_t index = 0; index < samples.size(); ++index) {
+    if (index != 0U) {
+      output << ',';
+    }
+    const BenchmarkSample& sample = samples[index];
+    output << "{\"iteration\":" << sample.iteration
+           << ",\"sample_kind\":" << JsonString(sample.kind)
+           << ",\"phases\":" << TimingJson(sample.timing)
+           << ",\"peak_resident_host_bytes\":" << sample.memory.peak_resident_host_bytes
+           << ",\"current_device_bytes\":" << sample.memory.current_device_bytes
+           << ",\"peak_device_bytes\":" << sample.memory.peak_device_bytes << '}';
+  }
+  output << "]}\n";
+  WriteTextAtomically(arguments.timing_output, output.str());
+}
+
 [[nodiscard]] bool SameSequence(const v1::SensorFrame& previous, const v1::SensorFrame& current) {
   const auto& first = previous.frame_key();
   const auto& second = current.frame_key();
@@ -490,12 +611,131 @@ int Run(const Arguments& arguments) {
   return EXIT_SUCCESS;
 }
 
+int RunBenchmark(const Arguments& arguments) {
+  const auto input_paths = ReadInputList(arguments.input_list);
+  const std::uint64_t startup_started = junctionlens::infer::MonotonicNowNanoseconds();
+  auto runtime = LoadRuntime(arguments);
+  const double startup_ms = junctionlens::infer::ElapsedMilliseconds(
+      startup_started, junctionlens::infer::MonotonicNowNanoseconds());
+  WriteProviderLog(arguments, *runtime);
+  BufferPool pool(arguments.buffer_slots);
+  std::vector<v1::SensorFrame> cached_frames;
+  std::vector<junctionlens::infer::PreprocessedInputs> cached_inputs;
+  if (arguments.input_profile == "predecoded") {
+    cached_frames.reserve(input_paths.size());
+    cached_inputs.reserve(input_paths.size());
+    std::optional<v1::SensorFrame> previous;
+    for (const auto& input_path : input_paths) {
+      cached_frames.push_back(ParseSensorFrame(input_path));
+      const v1::SensorFrame& current = cached_frames.back();
+      const v1::SensorFrame* paired_previous =
+          previous.has_value() && SameSequence(*previous, current) ? &*previous : nullptr;
+      auto lease = pool.Acquire();
+      cached_inputs.push_back(
+          junctionlens::infer::Preprocess(paired_previous, current, arguments.asset_root, lease));
+      lease.Release();
+      previous = current;
+    }
+  }
+  const std::size_t total_frames =
+      arguments.warmup_frames + arguments.measured_frames + arguments.stability_frames;
+  std::vector<BenchmarkSample> samples;
+  samples.reserve(arguments.warmup_frames + arguments.measured_frames +
+                  (arguments.stability_frames / arguments.memory_sample_period) + 2U);
+  std::optional<v1::SensorFrame> previous;
+  std::size_t stability_processed = 0U;
+  for (std::size_t iteration = 0U; iteration < total_frames; ++iteration) {
+    if (iteration == arguments.warmup_frames + arguments.measured_frames) {
+      runtime->SetDeviceMemoryTracking(true);
+    }
+    const std::size_t input_index = iteration % input_paths.size();
+    const std::uint64_t end_to_end_started = junctionlens::infer::MonotonicNowNanoseconds();
+    auto lease = pool.Acquire();
+    std::optional<v1::SensorFrame> loaded;
+    const junctionlens::infer::PreprocessedInputs* selected = nullptr;
+    std::optional<junctionlens::infer::PreprocessedInputs> transient;
+    if (arguments.input_profile == "predecoded") {
+      selected = &cached_inputs[input_index];
+      lease.Advance(BufferState::kPreprocessing);
+    } else {
+      loaded = ParseSensorFrame(input_paths[input_index]);
+      const v1::SensorFrame* paired_previous =
+          previous.has_value() && SameSequence(*previous, *loaded) ? &*previous : nullptr;
+      transient =
+          junctionlens::infer::Preprocess(paired_previous, *loaded, arguments.asset_root, lease);
+      selected = &*transient;
+    }
+    lease.Advance(BufferState::kInference);
+    RuntimePhaseTiming timing;
+    auto output = runtime->Infer(*selected, lease, &timing);
+    if (arguments.input_profile == "predecoded") {
+      timing.decode_ms = 0.0;
+      timing.preprocess_ms = 0.0;
+    }
+    const std::uint64_t track_started = junctionlens::infer::MonotonicNowNanoseconds();
+    {
+      const junctionlens::infer::NvtxRange range("track");
+      if (loaded.has_value()) {
+        previous = *loaded;
+      }
+    }
+    timing.track_ms = junctionlens::infer::ElapsedMilliseconds(
+        track_started, junctionlens::infer::MonotonicNowNanoseconds());
+    const std::uint64_t serialize_started = junctionlens::infer::MonotonicNowNanoseconds();
+    std::string serialized;
+    {
+      const junctionlens::infer::NvtxRange range("serialize");
+      if (!output.SerializeToString(&serialized) || serialized.empty()) {
+        throw RuntimeError("RUNTIME_OUTPUT_IO", "benchmark output could not be serialized");
+      }
+    }
+    timing.serialize_ms = junctionlens::infer::ElapsedMilliseconds(
+        serialize_started, junctionlens::infer::MonotonicNowNanoseconds());
+    timing.end_to_end_ms = junctionlens::infer::ElapsedMilliseconds(
+        end_to_end_started, junctionlens::infer::MonotonicNowNanoseconds());
+    lease.Release();
+    const RuntimeMemoryHighWater memory = runtime->memory_high_water();
+    const bool warmup = iteration < arguments.warmup_frames;
+    const bool measured =
+        !warmup && iteration < arguments.warmup_frames + arguments.measured_frames;
+    if (warmup || measured) {
+      samples.push_back({warmup ? iteration : iteration - arguments.warmup_frames,
+                         warmup ? "warmup" : "measured", timing, memory});
+    } else {
+      ++stability_processed;
+      if (stability_processed == 1U || stability_processed % arguments.memory_sample_period == 0U ||
+          stability_processed == arguments.stability_frames) {
+        samples.push_back({stability_processed - 1U, "stability", timing, memory});
+      }
+    }
+  }
+  if (!pool.all_free()) {
+    throw RuntimeError("RUNTIME_BUFFER_LEAK", "benchmark buffer slots were not released");
+  }
+  const std::filesystem::path onnx_profile_path = runtime->EndProfiling();
+  WriteBenchmarkReport(arguments, *runtime, startup_ms, samples, stability_processed,
+                       onnx_profile_path);
+  const RuntimeMemoryHighWater memory = runtime->memory_high_water();
+  std::cout << "{\"schema_version\":\"junctionlens.runtime-benchmark-receipt.v1\","
+               "\"status\":\"MEASURED_UNQUALIFIED\",\"timing_output\":"
+            << JsonString(arguments.timing_output.string())
+            << ",\"warmup_frames\":" << arguments.warmup_frames
+            << ",\"measured_frames\":" << arguments.measured_frames
+            << ",\"stability_frames\":" << stability_processed
+            << ",\"peak_resident_host_bytes\":" << memory.peak_resident_host_bytes
+            << ",\"peak_device_bytes\":" << memory.peak_device_bytes << "}\n";
+  return EXIT_SUCCESS;
+}
+
 }  // namespace
 
 int main(const int argc, char** argv) {
   try {
     const Arguments arguments = ParseArguments(argc, argv);
-    return arguments.command == "doctor" ? RunDoctor(arguments) : Run(arguments);
+    if (arguments.command == "doctor") {
+      return RunDoctor(arguments);
+    }
+    return arguments.command == "benchmark" ? RunBenchmark(arguments) : Run(arguments);
   } catch (const RuntimeError& error) {
     std::cerr << "runtime error [" << error.reason_code() << "]: " << error.what() << '\n';
   } catch (const Ort::Exception& error) {

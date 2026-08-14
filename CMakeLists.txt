@@ -111,6 +111,7 @@ add_library(
   junctionlens_infer
   STATIC
     cpp/src/infer/buffer_pool.cpp
+    cpp/src/infer/instrumentation.cpp
     cpp/src/infer/preprocess.cpp
     cpp/src/infer/provider.cpp
     cpp/src/infer/runtime.cpp
@@ -148,8 +149,12 @@ target_compile_definitions(
     JUNCTIONLENS_ONNXRUNTIME_LIBRARY_SHA256="${JUNCTIONLENS_ONNXRUNTIME_LIBRARY_SHA256}"
 )
 if(JUNCTIONLENS_ENABLE_CUDA_RUNTIME)
-  target_compile_definitions(junctionlens_infer PRIVATE JUNCTIONLENS_ENABLE_CUDA_RUNTIME=1)
-  target_link_libraries(junctionlens_infer PRIVATE CUDA::cudart)
+  target_compile_definitions(
+    junctionlens_infer
+    PUBLIC JUNCTIONLENS_ENABLE_NVTX=1
+    PRIVATE JUNCTIONLENS_ENABLE_CUDA_RUNTIME=1
+  )
+  target_link_libraries(junctionlens_infer PRIVATE CUDA::cudart PUBLIC CUDA::nvtx3)
 endif()
 junctionlens_enable_sanitizers(junctionlens_infer)
 set_target_properties(

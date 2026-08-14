@@ -7,6 +7,7 @@ It transfers only a deterministic manifest of Git-tracked source files and never
 
 Configure an SSH alias for a compatible Ubuntu 24.04 x86-64 machine with an NVIDIA GPU, driver 570.26 or newer, CUDA 12.8, and cuDNN 9.14.0.64.
 The remote account needs `python3`, `git`, `ssh`, `scp`, and network access to the exact locked public dependency sources.
+The `runtime-performance`, `core`, and `full-v1` profiles also require the Nsight Systems `nsys` CLI.
 TensorRT 10.14.1.48 remains conditional and does not block the mandatory CUDA result.
 
 Set machine-local values in the invoking environment.
@@ -20,6 +21,7 @@ export JUNCTIONLENS_REMOTE_DATA_ROOT=/existing/licensed/openlane-v2
 ```
 
 `JUNCTIONLENS_REMOTE_DATA_ROOT` is optional for the `runtime-cuda` profile because that profile uses only repository-owned synthetic parity inputs.
+It is also optional for `runtime-performance`, which uses the same repository-owned synthetic inputs for the absolute runtime gate.
 `JUNCTIONLENS_GPU_UUID` may select one visible GPU explicitly.
 Without an override, the runner selects the lexicographically smallest healthy UUID that satisfies the memory requirement.
 
@@ -47,4 +49,12 @@ Blocked and failed runs also contain `USER_ACTION_REQUIRED.md` with the exact re
 
 The `runtime-cuda` profile is the Milestone 8.2 target gate only.
 It does not accept the later portfolio core checkpoint or full V1 release.
-At this source milestone, requesting `core` or `full-v1` returns a truthful blocked result until their later phase handlers exist.
+The Milestone 8.3 target gate uses:
+
+```sh
+./scripts/gpu/qualify_remote.sh --profile runtime-performance
+```
+
+That profile inherits CUDA correctness, then runs the frozen latency and stability protocol under continuous GPU telemetry and records separate Nsight Systems and ONNX Runtime profiles.
+It exits nonzero for a failed budget, an incomplete 10,000-frame run, profiler failure, or contaminated environment.
+At this source milestone, requesting `core` or `full-v1` still returns a truthful blocked result after the implemented runtime phases until their later handlers exist.

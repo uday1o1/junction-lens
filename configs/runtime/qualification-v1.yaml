@@ -1,0 +1,32 @@
+schema_version: junctionlens.runtime-qualification-config.v1
+protocol:
+  warmup_frames: 200
+  measured_frames: 2000
+  stability_frames: 10000
+  memory_sample_period: 100
+  input_profile: predecoded
+absolute_budgets:
+  throughput_per_second_minimum: 10.0
+  p95_latency_ms_maximum: 100.0
+  p99_latency_ms_maximum: 125.0
+  peak_device_memory_bytes_maximum: 6442450944
+  unexpected_cpu_provider_nodes_maximum: 0
+stability:
+  host_growth_bytes_maximum: 67108864
+  device_growth_bytes_maximum: 33554432
+  host_slope_bytes_per_1000_frames_maximum: 1048576
+  device_slope_bytes_per_1000_frames_maximum: 1048576
+benchmark_validity:
+  monitor_interval_seconds: 1.0
+  minimum_monitor_samples: 10
+  temperature_c_maximum: 85
+  graphics_clock_coefficient_of_variation_maximum: 0.10
+  power_limit_fraction_maximum: 1.02
+  competing_compute_processes_maximum: 0
+  volatile_ecc_errors_maximum: 0
+  xid_errors_maximum: 0
+  allowed_active_throttle_reasons: [Not Active]
+profiling:
+  warmup_frames: 20
+  measured_frames: 100
+  maximum_duration_seconds: 120

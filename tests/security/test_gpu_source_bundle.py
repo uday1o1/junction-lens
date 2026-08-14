@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import stat
 import tarfile
 from pathlib import Path
 
@@ -30,6 +31,14 @@ def test_tracked_source_bundle_round_trips_and_is_reproducible(tmp_path: Path) -
     verified = verify_and_extract(first_archive, first_manifest, target)
     assert verified["git_commit"] == first["git_commit"]
     assert (target / "BUILD_PLAN.md").is_file()
+    assert (target / "configs/runtime/qualification-v1.yaml").is_file()
+    for relative in (
+        "scripts/gpu/benchmark_runtime.py",
+        "scripts/gpu/profile_runtime.py",
+    ):
+        extracted = target / relative
+        assert extracted.is_file()
+        assert extracted.stat().st_mode & stat.S_IXUSR
     assert not (target / ".git").exists()
 
 
