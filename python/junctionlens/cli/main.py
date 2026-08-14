@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 
@@ -13,7 +13,7 @@ from junctionlens.cli.data import data_app
 from junctionlens.cli.model import model_app
 from junctionlens.cli.synthetic import synthetic_app
 from junctionlens.doctor.service import run_doctor
-from junctionlens.evaluator import EvaluationError, evaluate_official
+from junctionlens.evaluator import EvaluationError, evaluate_custom, evaluate_official
 
 app = typer.Typer(
     name="junctionlens",
@@ -62,17 +62,62 @@ def doctor_command(
 @app.command("evaluate")
 def evaluate_command(
     input_path: Annotated[
-        Path,
+        Path | None,
         typer.Option("--input", exists=True, dir_okay=False, resolve_path=True),
-    ],
+    ] = None,
+    ground_truth_root: Annotated[
+        Path | None,
+        typer.Option("--ground-truth", exists=True, resolve_path=True),
+    ] = None,
+    prediction_root: Annotated[
+        Path | None,
+        typer.Option("--predictions", exists=True, resolve_path=True),
+    ] = None,
+    artifact_root: Annotated[
+        Path | None,
+        typer.Option("--artifact-root", file_okay=False, resolve_path=True),
+    ] = None,
     project_root: Annotated[
         Path,
         typer.Option(hidden=True, exists=True, file_okay=False, dir_okay=True, resolve_path=True),
     ] = Path(),
 ) -> None:
-    """Compute official metrics in the isolated compatibility image."""
+    """Compute official metrics or immutable custom graph and temporal KPIs."""
     try:
-        result = evaluate_official(input_path, project_root)
+        custom_values = (ground_truth_root, prediction_root, artifact_root)
+        if any(value is not None for value in custom_values):
+            if input_path is not None or any(value is None for value in custom_values):
+                raise EvaluationError(
+                    "custom evaluation requires --ground-truth, --predictions, and "
+                    "--artifact-root, with no --input"
+                )
+            receipt = evaluate_custom(
+                cast(Path, ground_truth_root),
+                cast(Path, prediction_root),
+                cast(Path, artifact_root),
+                project_root,
+            )
+            result = {
+                "artifacts": {
+                    "frame_kpi_table": {
+                        "manifest_sha256": receipt.frame_table_manifest_sha256,
+                        "payload_sha256": receipt.frame_table_payload_sha256,
+                    },
+                    "match_map": {
+                        "manifest_sha256": receipt.match_manifest_sha256,
+                        "payload_sha256": receipt.match_payload_sha256,
+                    },
+                    "segment_kpi_table": {
+                        "manifest_sha256": receipt.segment_table_manifest_sha256,
+                        "payload_sha256": receipt.segment_table_payload_sha256,
+                    },
+                },
+                "schema_version": "junctionlens.custom-evaluation-receipt.v1",
+            }
+        elif input_path is not None:
+            result = evaluate_official(input_path, project_root)
+        else:
+            raise EvaluationError("official evaluation requires --input")
     except (EvaluationError, OSError, ValueError) as error:
         typer.echo(f"evaluation error: {error}", err=True)
         raise typer.Exit(code=2) from error

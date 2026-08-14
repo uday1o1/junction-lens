@@ -16,6 +16,7 @@ import cv2
 import numpy as np
 import scipy
 import shapely
+from custom_match import CustomMatchError, run_custom_match
 from evaluator_payload import EvaluatorPayloadError, parse_payload_bytes
 from openlanev2.lanesegment.evaluation import evaluate
 from ortools import __version__ as ortools_version
@@ -132,8 +133,16 @@ def run(path: Path) -> dict[str, Any]:
 
 
 def main() -> int:
+    if len(sys.argv) == 3 and sys.argv[1] == "--custom-match":
+        try:
+            output = run_custom_match(Path(sys.argv[2]))
+        except (CustomMatchError, OSError, KeyError, TypeError, ValueError) as error:
+            print(f"custom match error: {error}", file=sys.stderr)
+            return 2
+        print(json.dumps(output, allow_nan=False, separators=(",", ":"), sort_keys=True))
+        return 0
     if len(sys.argv) != 2:
-        print("usage: evaluator_runner.py INPUT.json", file=sys.stderr)
+        print("usage: evaluator_runner.py [--custom-match] INPUT.json", file=sys.stderr)
         return 2
     try:
         output = run(Path(sys.argv[1]))

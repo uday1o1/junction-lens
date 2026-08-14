@@ -34,6 +34,7 @@ Repository commands:
   test-integration-splits
   test-integration-audit
   test-integration-evaluator
+  test-integration-custom-kpis
   test-web
   build-evaluator [--check-lock]
   test-evaluator
@@ -53,6 +54,7 @@ Repository commands:
   verify-m2-2-local
   verify-m2-3-local
   verify-m3-1
+  verify-m3-2
 EOF
 }
 
@@ -97,13 +99,15 @@ case "$JL_COMMAND" in
     ;;
   format-check)
     uv run --locked ruff format --check \
-      python tests scripts containers/evaluator_runner.py containers/adapter_parity_runner.py
+      python tests scripts containers/evaluator_runner.py containers/adapter_parity_runner.py \
+      containers/custom_match.py
     "$0" format-cpp-check
     pnpm run format:check
     ;;
   lint)
     uv run --locked ruff check \
-      python tests scripts containers/evaluator_runner.py containers/adapter_parity_runner.py
+      python tests scripts containers/evaluator_runner.py containers/adapter_parity_runner.py \
+      containers/custom_match.py
     ;;
   typecheck)
     uv run --locked mypy
@@ -170,6 +174,13 @@ case "$JL_COMMAND" in
       "$JL_ROOT/tests/unit/test_evaluator_payload.py" \
       "$JL_ROOT/tests/security/test_evaluator_container.py" \
       "$@"
+    ;;
+  test-integration-custom-kpis)
+    uv run --locked pytest \
+      "$JL_ROOT/tests/unit/test_custom_kpis.py" \
+      "$JL_ROOT/tests/security/test_custom_match.py" \
+      "$@"
+    uv run --locked python "$JL_ROOT/scripts/evaluator/verify_custom_kpis.py"
     ;;
   test-web)
     pnpm run typecheck:web
@@ -271,6 +282,10 @@ case "$JL_COMMAND" in
     "$0" build-evaluator --check-lock
     "$0" test-integration-evaluator
     "$0" test-evaluator
+    ;;
+  verify-m3-2)
+    "$0" verify-m3-1
+    "$0" test-integration-custom-kpis
     ;;
   -h|--help|help)
     usage

@@ -10,7 +10,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -227,6 +227,7 @@ def evaluator_container_command(
     docker: str,
     reference: str,
     mounted_input: Path,
+    arguments: Sequence[str] | None = None,
 ) -> list[str]:
     """Build the one restricted invocation shared by production and parity checks."""
     return [
@@ -255,7 +256,7 @@ def evaluator_container_command(
         "--mount",
         f"type=bind,src={mounted_input},dst=/input/request.json,readonly",
         reference,
-        "/input/request.json",
+        *(arguments if arguments is not None else ("/input/request.json",)),
     ]
 
 

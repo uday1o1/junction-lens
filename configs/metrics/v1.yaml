@@ -1,0 +1,118 @@
+schema_version: junctionlens.metrics.v1
+policy:
+  custom_match: CustomMatchV1
+  edge_threshold: 0.5
+  confident_wrong_threshold: 0.9
+  successor_endpoint_gap_threshold_m: 2.0
+  empty_denominator: null
+  quantile_method: linear_type_7
+  temporal_geometry_resample_points: 20
+metrics:
+  control_edge_precision:
+    direction: higher_is_better
+    unit: ratio
+    population: thresholded predicted control-to-lane edges between matched eligible nodes
+    denominator: predicted eligible edges
+    missing: null_when_empty
+  control_edge_recall:
+    direction: higher_is_better
+    unit: ratio
+    population: ground-truth control-to-lane edges with matched endpoints
+    denominator: eligible ground-truth edges
+    missing: null_when_empty
+  wrong_control_assignment_rate:
+    direction: lower_is_better
+    unit: ratio
+    population: eligible matched controls with at least one thresholded predicted edge
+    denominator: eligible controls with a predicted edge
+    missing: null_when_empty
+  confident_wrong_control_rate:
+    direction: lower_is_better
+    unit: ratio
+    population: eligible matched controls with at least one thresholded predicted edge
+    denominator: eligible controls with a predicted edge
+    missing: null_when_empty
+  reachability_recall_h3:
+    direction: higher_is_better
+    unit: ratio
+    population: matched ground-truth lane pairs reachable within one to three hops
+    denominator: eligible reachable lane pairs
+    missing: null_when_empty
+  path_blocking_rate_h3:
+    direction: lower_is_better
+    unit: ratio
+    population: matched ground-truth lanes with an eligible continuation within three hops
+    denominator: eligible source lanes
+    missing: null_when_empty
+  successor_endpoint_gap_m_median:
+    direction: lower_is_better
+    unit: meter
+    population: thresholded predicted lane-successor edges
+    denominator: eligible predicted edges
+    missing: null_when_empty
+  successor_endpoint_gap_m_p90:
+    direction: lower_is_better
+    unit: meter
+    population: thresholded predicted lane-successor edges
+    denominator: eligible predicted edges
+    missing: null_when_empty
+  successor_endpoint_gap_m_p95:
+    direction: lower_is_better
+    unit: meter
+    population: thresholded predicted lane-successor edges
+    denominator: eligible predicted edges
+    missing: null_when_empty
+  successor_endpoint_gap_over_threshold_rate:
+    direction: lower_is_better
+    unit: ratio
+    population: thresholded predicted lane-successor edges
+    denominator: eligible predicted edges
+    missing: null_when_empty
+  spurious_successor_rate:
+    direction: lower_is_better
+    unit: ratio
+    population: thresholded predicted successor edges between matched lanes
+    denominator: eligible predicted edges
+    missing: null_when_empty
+  presence_flicker_rate:
+    direction: lower_is_better
+    unit: ratio
+    population: source-identified ground-truth nodes present for at least three consecutive frames
+    denominator: eligible adjacent-frame transitions
+    missing: null_when_empty
+  successor_edge_flip_rate:
+    direction: lower_is_better
+    unit: ratio
+    population: persistent ground-truth successor edges
+    denominator: eligible adjacent-frame edge transitions
+    missing: null_when_empty
+  control_edge_flip_rate:
+    direction: lower_is_better
+    unit: ratio
+    population: persistent ground-truth control-to-lane edges
+    denominator: eligible adjacent-frame edge transitions
+    missing: null_when_empty
+  geometry_jitter_m_median:
+    direction: lower_is_better
+    unit: meter
+    population: persistent matched lane and road-area nodes with valid ego poses
+    denominator: eligible node transitions
+    missing: null_when_empty
+  geometry_jitter_m_p90:
+    direction: lower_is_better
+    unit: meter
+    population: persistent matched lane and road-area nodes with valid ego poses
+    denominator: eligible node transitions
+    missing: null_when_empty
+  geometry_jitter_m_p95:
+    direction: lower_is_better
+    unit: meter
+    population: persistent matched lane and road-area nodes with valid ego poses
+    denominator: eligible node transitions
+    missing: null_when_empty
+  id_switches_per_100_tracks:
+    direction: lower_is_better
+    unit: switches_per_100_tracks
+    population: eligible source-identified ground-truth tracks with matched tracked predictions
+    denominator: unique eligible ground-truth tracks
+    missing: null_when_empty

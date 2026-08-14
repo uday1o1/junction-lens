@@ -19,7 +19,7 @@
     },
     {
       "name": "sanitizers",
-      "displayName": "Clang ASan and UBSan geometry gate",
+      "displayName": "Clang ASan and UBSan native library gate",
       "inherits": "cpu",
       "binaryDir": "${sourceDir}/build/sanitizers",
       "cacheVariables": {
@@ -36,7 +36,7 @@
     {
       "name": "sanitizers",
       "configurePreset": "sanitizers",
-      "targets": ["junctionlens-geometry-tests"]
+      "targets": ["junctionlens-geometry-tests", "junctionlens-eval-tests"]
     }
   ],
   "testPresets": [
@@ -52,7 +52,7 @@
       "configurePreset": "sanitizers",
       "filter": {
         "include": {
-          "name": "^geometry\\."
+          "name": "^(geometry|eval)\\."
         }
       },
       "environment": {

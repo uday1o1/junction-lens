@@ -63,6 +63,11 @@ target_include_directories(junctionlens_geometry PUBLIC "${PROJECT_SOURCE_DIR}/c
 target_link_libraries(junctionlens_geometry PUBLIC Eigen3::Eigen)
 junctionlens_enable_sanitizers(junctionlens_geometry)
 
+add_library(junctionlens_eval STATIC cpp/src/eval/metrics.cpp)
+add_library(junctionlens::eval ALIAS junctionlens_eval)
+target_include_directories(junctionlens_eval PUBLIC "${PROJECT_SOURCE_DIR}/cpp/include")
+junctionlens_enable_sanitizers(junctionlens_eval)
+
 if(NOT TARGET onnxruntime::onnxruntime)
   message(
     FATAL_ERROR
@@ -85,6 +90,7 @@ if(MSVC)
   target_compile_options(junctionlens_contract PRIVATE /W4 /WX)
   target_compile_options(junctionlens-contract-probe PRIVATE /W4 /WX)
   target_compile_options(junctionlens_geometry PRIVATE /W4 /WX)
+  target_compile_options(junctionlens_eval PRIVATE /W4 /WX)
 else()
   set(
     JUNCTIONLENS_WARNING_OPTIONS
@@ -100,6 +106,7 @@ else()
   target_compile_options(junctionlens_contract PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   target_compile_options(junctionlens-contract-probe PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   target_compile_options(junctionlens_geometry PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
+  target_compile_options(junctionlens_eval PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   if(APPLE)
     set(JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS -Wno-gcc-compat -Wno-nullability-extension)
     target_compile_options(junctionlens_contract PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS})
@@ -126,6 +133,20 @@ if(BUILD_TESTING)
   endif()
   include(GoogleTest)
   gtest_discover_tests(junctionlens-geometry-tests TEST_PREFIX geometry.)
+  add_executable(junctionlens-eval-tests cpp/tests/eval/metrics_test.cpp)
+  target_link_libraries(junctionlens-eval-tests PRIVATE junctionlens::eval GTest::gtest_main)
+  target_compile_definitions(
+    junctionlens-eval-tests
+    PRIVATE
+      JUNCTIONLENS_CUSTOM_METRIC_GOLDENS="${PROJECT_SOURCE_DIR}/tests/fixtures/evaluator/custom_metric_goldens.txt"
+  )
+  junctionlens_enable_sanitizers(junctionlens-eval-tests)
+  if(MSVC)
+    target_compile_options(junctionlens-eval-tests PRIVATE /W4 /WX)
+  else()
+    target_compile_options(junctionlens-eval-tests PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
+  endif()
+  gtest_discover_tests(junctionlens-eval-tests TEST_PREFIX eval.)
   set_tests_properties(
     toolchain-probe-json
     PROPERTIES

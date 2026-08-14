@@ -115,6 +115,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"]
+"containers/custom_match.py" = ["UP038", "UP045"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -129,6 +130,10 @@ follow_imports = "skip"
 
 [[tool.mypy.overrides]]
 module = ["onnxruntime", "onnxruntime.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pyarrow", "pyarrow.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
