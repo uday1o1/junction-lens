@@ -105,6 +105,23 @@
           "url": "https://github.com/docker/buildx/releases/download/v0.34.1/buildx-v0.34.1.linux-amd64"
         }
       }
+    },
+    "onnxruntime-cpp": {
+      "version": "1.25.0",
+      "assets": {
+        "darwin-arm64": {
+          "archive_type": "tar.gz",
+          "sha256": "65405dc8793c86cadb98b5e07f6d3bdde84f8300f1b030d4736b41c17610d6c1",
+          "strip_components": 1,
+          "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.25.0/onnxruntime-osx-arm64-1.25.0.tgz"
+        },
+        "linux-x86_64": {
+          "archive_type": "tar.gz",
+          "sha256": "e0a8998e70416801f9a634a8ea1d369a255ff109741469f9d99cf369a46a1492",
+          "strip_components": 1,
+          "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.25.0/onnxruntime-linux-x64-1.25.0.tgz"
+        }
+      }
     }
   }
 }

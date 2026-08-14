@@ -1,0 +1,58 @@
+schema_version: "1.0.0"
+hard_limits:
+  gpu_hours: 120.0
+  generated_artifacts_gib: 400.0
+minimum_contingency_fraction: 0.20
+experiments:
+  - id: e0-primary-and-robustness
+    architecture_scope: E0
+    purpose: baseline-final
+    seeds: [20260813, 20260814, 20260815]
+    gpu_hours: 24.0
+    generated_artifacts_gib: 72.0
+  - id: e1-screen
+    architecture_scope: E1
+    purpose: screen
+    seeds: [20260813]
+    gpu_hours: 12.0
+    generated_artifacts_gib: 36.0
+  - id: e2-screen
+    architecture_scope: E2
+    purpose: screen
+    seeds: [20260813]
+    gpu_hours: 16.0
+    generated_artifacts_gib: 48.0
+  - id: e3-screen
+    architecture_scope: E3
+    purpose: screen
+    seeds: [20260813]
+    gpu_hours: 2.0
+    generated_artifacts_gib: 8.0
+  - id: selected-final-robustness
+    architecture_scope: selected-final
+    purpose: robustness
+    seeds: [20260814, 20260815]
+    gpu_hours: 28.0
+    generated_artifacts_gib: 80.0
+  - id: profiling-and-qualification
+    architecture_scope: infrastructure
+    purpose: qualification
+    seeds: [20260813]
+    gpu_hours: 8.0
+    generated_artifacts_gib: 24.0
+checkpoint_policy:
+  latest_cadence_epochs: 1
+  model_selection_cadence_epochs: 1
+  screen_best_checkpoints_retained: 2
+  final_best_checkpoints_retained: 3
+  retain_last_checkpoint: true
+  retain_optimizer_state_for: [active, promoted]
+  discard_optimizer_state_for: [rejected, completed-screen]
+  resumable_safe_checkpoint_on_budget_abort: true
+promotion_policy:
+  screening_seed: 20260813
+  robustness_seeds: [20260814, 20260815]
+  screened_architectures: [E1, E2, E3]
+  robustness_eligible_architectures: [E0, selected-final]
+  selection_partition_only: true
+  holdout_selection_prohibited: true

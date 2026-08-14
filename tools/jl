@@ -27,6 +27,12 @@ Milestone 0 commands:
   verify-locks [--online]
   verify-m0-1
   verify-m0-2-local
+  model-overfit [--steps N]
+  model-export
+  model-parity
+  model-providers
+  model-benchmark
+  verify-m0-3-local
 EOF
 }
 
@@ -79,6 +85,21 @@ case "$JL_COMMAND" in
   verify-locks)
     uv run --locked python -m junctionlens.locks.verify "$@"
     ;;
+  model-overfit)
+    uv run --locked junctionlens model micro-overfit "$@"
+    ;;
+  model-export)
+    uv run --locked junctionlens model export "$@"
+    ;;
+  model-parity)
+    uv run --locked junctionlens model parity "$@"
+    ;;
+  model-providers)
+    uv run --locked junctionlens model probe-providers "$@"
+    ;;
+  model-benchmark)
+    uv run --locked junctionlens model benchmark-m0 "$@"
+    ;;
   verify-m0-1)
     uv lock --check
     uv sync --locked --extra cpu --extra analytics --extra service
@@ -97,6 +118,16 @@ case "$JL_COMMAND" in
     "$0" verify-m0-1
     "$0" build-evaluator --check-lock
     "$0" test-evaluator
+    ;;
+  verify-m0-3-local)
+    "$0" verify-m0-2-local
+    "$0" model-overfit
+    "$0" model-export
+    "$0" build-cpu
+    "$0" model-parity
+    "$0" model-providers
+    "$0" test-evaluator --output "$JL_ROOT/artifacts/m0/model-spike/evaluator.json"
+    "$0" model-benchmark
     ;;
   -h|--help|help)
     usage

@@ -1,0 +1,47 @@
+schema_version: "1.0.0"
+profile_id: m0-feasibility-spike-v1
+seed: 20260813
+input:
+  timestamps: 2
+  cameras: 8
+  channels: 3
+  height: 384
+  width: 640
+  color_order: RGB
+  resize_policy: letterbox-fit
+  interpolation: bilinear
+  pad_value: 0
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+model:
+  hidden_dimension: 64
+  track_embedding_dimension: 16
+  lane_queries: 96
+  traffic_queries: 64
+  area_queries: 32
+  lane_points: 11
+  area_points: 20
+  lane_boundary_classes: 3
+  traffic_categories: 2
+  traffic_attributes: 13
+  area_categories: 2
+  spike_encoder: calibration-aware-masked-global-pool
+  final_reference_encoder: efficientnet-b0-feature-pyramid
+  final_reference_hidden_dimension: 256
+export:
+  opset: 18
+  dynamic_axes: [batch]
+  precision: fp32
+  output_zero_deadband: 0.05
+micro_overfit:
+  frames: 32
+  maximum_steps: 5000
+  default_steps: 1500
+  learning_rate: 0.002
+  weight_decay: 0.01
+  gradient_clip_norm: 1.0
+  cpu_spatial_size: 8
+  minimum_loss_reduction: 0.90
+  minimum_node_category_accuracy: 0.98
+  maximum_centerline_point_error_m: 0.25
+  topology_gate_state: DEFERRED_TO_M5_PER_ADR_0001

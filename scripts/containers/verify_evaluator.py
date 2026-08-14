@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +57,7 @@ def verify() -> dict[str, Any]:
     results: dict[str, Any] = {}
     cache_root = root / ".cache/evaluator-fixtures"
     cache_root.mkdir(parents=True, exist_ok=True)
+    benchmark_start = time.perf_counter()
     with tempfile.TemporaryDirectory(prefix="junctionlens-evaluator-", dir=cache_root) as temp:
         temp_root = Path(temp)
         for name, case in cases.items():
@@ -64,6 +67,7 @@ def verify() -> dict[str, Any]:
                 encoding="utf-8",
             )
             results[name] = _run_cli(root, request)
+    benchmark_seconds = time.perf_counter() - benchmark_start
     perfect = results["perfect"]["metrics"]
     if set(perfect.values()) != {1.0}:
         raise EvaluatorVerificationError(f"perfect fixture is not optimal: {perfect!r}")
@@ -88,14 +92,32 @@ def verify() -> dict[str, Any]:
         if any(metrics[component] != perfect[component] for component in detection_metrics):
             raise EvaluatorVerificationError(f"{name} unexpectedly changed detection: {metrics!r}")
     return {
+        "benchmark": {
+            "clock": "time.perf_counter",
+            "duration_seconds": benchmark_seconds,
+            "profile": "public-cli-cold-container-per-segment",
+            "segments": len(cases),
+            "segments_per_second": len(cases) / benchmark_seconds,
+        },
         "cases": {name: result["metrics"] for name, result in sorted(results.items())},
         "status": "PASSED",
     }
 
 
+def _arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path)
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
     try:
-        print(json.dumps(verify(), sort_keys=True))
+        arguments = _arguments()
+        report = json.dumps(verify(), sort_keys=True, indent=2, allow_nan=False) + "\n"
+        if arguments.output is not None:
+            arguments.output.parent.mkdir(parents=True, exist_ok=True)
+            arguments.output.write_text(report, encoding="utf-8")
+        print(report, end="")
     except (EvaluatorVerificationError, OSError, ValueError) as error:
         print(f"evaluator verification error: {error}", file=sys.stderr)
         raise SystemExit(1) from error

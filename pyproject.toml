@@ -28,6 +28,8 @@ analytics = [
 cpu = [
   "numpy==2.2.6",
   "onnx==1.18.0",
+  "onnx-ir==1.0.0",
+  "onnxscript==0.7.1",
   "onnxruntime==1.25.0",
   "scipy==1.15.3",
   "torch==2.8.0",
@@ -36,6 +38,8 @@ cpu = [
 cuda = [
   "numpy==2.2.6; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "onnx==1.18.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "onnx-ir==1.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "onnxscript==0.7.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "onnxruntime==1.25.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "scipy==1.15.3; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "torch==2.8.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -112,6 +116,14 @@ python_version = "3.12"
 strict = true
 packages = ["junctionlens"]
 mypy_path = "python"
+
+[[tool.mypy.overrides]]
+module = ["torch", "torch.*"]
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = ["onnxruntime", "onnxruntime.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers -ra"

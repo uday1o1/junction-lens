@@ -219,7 +219,9 @@ analytics = [
 cpu = [
     { name = "numpy", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
     { name = "onnx", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
+    { name = "onnx-ir", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
     { name = "onnxruntime", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
+    { name = "onnxscript", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
     { name = "scipy", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
     { name = "torch", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine != 'arm64' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
     { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine != 'x86_64' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
@@ -229,7 +231,9 @@ cpu = [
 cuda = [
     { name = "numpy", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "onnx", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "onnx-ir", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "onnxruntime", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "onnxscript", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "scipy", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "torchvision", version = "0.23.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
@@ -260,8 +264,12 @@ requires-dist = [
     { name = "numpy", marker = "extra == 'cpu'", specifier = "==2.2.6" },
     { name = "onnx", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cuda'", specifier = "==1.18.0" },
     { name = "onnx", marker = "extra == 'cpu'", specifier = "==1.18.0" },
+    { name = "onnx-ir", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cuda'", specifier = "==1.0.0" },
+    { name = "onnx-ir", marker = "extra == 'cpu'", specifier = "==1.0.0" },
     { name = "onnxruntime", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cuda'", specifier = "==1.25.0" },
     { name = "onnxruntime", marker = "extra == 'cpu'", specifier = "==1.25.0" },
+    { name = "onnxscript", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cuda'", specifier = "==0.7.1" },
+    { name = "onnxscript", marker = "extra == 'cpu'", specifier = "==0.7.1" },
     { name = "platformdirs", specifier = "==4.3.8" },
     { name = "polars", marker = "extra == 'analytics'", specifier = "==1.31.0" },
     { name = "protobuf", specifier = "==6.31.1" },
@@ -323,6 +331,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "ml-dtypes"
+version = "0.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/12/72/307d7c4bd0600601c7133fba5cb78af7db968152951c1cd473abb1cda782/ml_dtypes-0.6.0.tar.gz", hash = "sha256:5e60251d32ced5598972e4d5e06a2f044341f9291402551a3f6f0ec44f9299b0", size = 3032327, upload-time = "2026-08-13T14:14:40.215Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/84/6a/441eb053b078954f7fea284dfb288701884d0a1404d39babb858e1649023/ml_dtypes-0.6.0-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:5359c588cc62de6f78d7430f06b65853d884955494d86d6ad90b6dd64a3f3a08", size = 565447, upload-time = "2026-08-13T14:14:01.737Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/f9/7d76c1eae866f5d4636401b31b6d6dd90e4b4ced1fa7cfdfcca9c60e4bd3/ml_dtypes-0.6.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3b4a480aa8fd54a1805b8ac10f3f91763926a74f73c0c364c10f9231854f4170", size = 409890, upload-time = "2026-08-13T14:14:04.248Z" },
 ]
 
 [[package]]
@@ -523,6 +544,22 @@ wheels = [
 ]
 
 [[package]]
+name = "onnx-ir"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ml-dtypes", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+    { name = "numpy", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+    { name = "onnx", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+    { name = "sympy", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+    { name = "typing-extensions", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d6/c2/61194cec0dbc5622273c0ebd592d37cc1dca0d7f1a744f02edd45ac905a3/onnx_ir-1.0.0.tar.gz", hash = "sha256:9e261f25fde8da9612ae5cb43b3b374d5ff469c04af0363cad588b2bb000b812", size = 163121, upload-time = "2026-08-11T14:49:46.895Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/91/cd/6d1637172eb59c7b18ac90ed089d1f599a11fe0e63b4db2d017f3bb38a32/onnx_ir-1.0.0-py3-none-any.whl", hash = "sha256:e578f0d608d3062866b48223616eb2d10a6d6d01f8b8faac596129034f483cc7", size = 185849, upload-time = "2026-08-11T14:49:45.524Z" },
+]
+
+[[package]]
 name = "onnxruntime"
 version = "1.25.0"
 source = { registry = "https://pypi.org/simple" }
@@ -535,6 +572,23 @@ dependencies = [
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7a/69/f98c6bda4c34ac382b70c36033a989ceffd1caf5afba47bd2ef26535850f/onnxruntime-1.25.0-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:8ecd3362de3fb496fb3e2d055a95d5acab611cf759a27609c6d99704c9d8f184", size = 17742518, upload-time = "2026-04-22T17:20:34.444Z" },
     { url = "https://files.pythonhosted.org/packages/a9/1b/d681878f227513917d8620e4ea504af5eb3313fc01f8aea7b19a976c65db/onnxruntime-1.25.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:be93baa694ef8e5831fcb7b542da21f502b122918b5b9612d9f02972e043ee01", size = 17996146, upload-time = "2026-04-22T17:19:53.792Z" },
+]
+
+[[package]]
+name = "onnxscript"
+version = "0.7.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ml-dtypes", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+    { name = "numpy", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+    { name = "onnx", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+    { name = "onnx-ir", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+    { name = "packaging", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+    { name = "typing-extensions", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c4/3a/4d79bce3f460e0df7fed54a92ce80827f25da66511da368bb00783ad8d20/onnxscript-0.7.1.tar.gz", hash = "sha256:309fb86484b11fa4ded90dba580e0d63f1a0827588e521cecaf2eeddb46d6e86", size = 618160, upload-time = "2026-06-29T23:33:21.526Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/bd/a0c8e737b6afda10e42a597787d53d5b66e00268df6f59184701eeae37d9/onnxscript-0.7.1-py3-none-any.whl", hash = "sha256:544763b7fdef49940cdd9412ff5135cbae96d59ac6bc1921457f21280f40f4b7", size = 721970, upload-time = "2026-06-29T23:33:23.298Z" },
 ]
 
 [[package]]

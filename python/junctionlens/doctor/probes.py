@@ -132,7 +132,7 @@ def probe_python() -> CapabilityEvidence:
 def probe_onnxruntime() -> CapabilityEvidence:
     """Inspect the imported ONNX Runtime package and real provider list."""
     try:
-        import onnxruntime  # type: ignore[import-untyped]
+        import onnxruntime
     except ImportError as error:
         return CapabilityEvidence(
             capability="onnxruntime",

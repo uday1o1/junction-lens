@@ -10,6 +10,29 @@ set(JUNCTIONLENS_PYBIND11_VERSION "3.0.1")
 set(JUNCTIONLENS_GOOGLETEST_VERSION "1.16.0")
 set(JUNCTIONLENS_RAPIDCHECK_COMMIT "6e8dadfdafa3a74eabb52ead87f8787f72eccd0b")
 
+set(
+  JUNCTIONLENS_ONNXRUNTIME_ROOT
+  "${PROJECT_SOURCE_DIR}/.tools/onnxruntime-cpp/${JUNCTIONLENS_ONNXRUNTIME_VERSION}"
+  CACHE PATH
+  "Path to the exact locked ONNX Runtime C++ release archive"
+)
+
+if(APPLE)
+  set(_junctionlens_onnxruntime_library "${JUNCTIONLENS_ONNXRUNTIME_ROOT}/lib/libonnxruntime.dylib")
+elseif(UNIX)
+  set(_junctionlens_onnxruntime_library "${JUNCTIONLENS_ONNXRUNTIME_ROOT}/lib/libonnxruntime.so")
+endif()
+
+if(DEFINED _junctionlens_onnxruntime_library AND EXISTS "${_junctionlens_onnxruntime_library}")
+  add_library(onnxruntime::onnxruntime SHARED IMPORTED GLOBAL)
+  set_target_properties(
+    onnxruntime::onnxruntime
+    PROPERTIES
+      IMPORTED_LOCATION "${_junctionlens_onnxruntime_library}"
+      INTERFACE_INCLUDE_DIRECTORIES "${JUNCTIONLENS_ONNXRUNTIME_ROOT}/include"
+  )
+endif()
+
 FetchContent_Declare(
   junctionlens_protobuf
   URL https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protobuf-31.1.tar.gz
