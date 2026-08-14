@@ -23,12 +23,19 @@ def _perfect() -> dict[str, object]:
 def test_all_frozen_cases_materialize_as_valid_bounded_inputs() -> None:
     cases = load_cases(FIXTURES)
     assert set(cases) == {
+        "adversarial_high_confidence_false_positive",
+        "adversarial_unpermuted_topology",
         "corrupt_area_geometry",
         "corrupt_control_topology",
         "corrupt_lane_geometry",
         "corrupt_lane_topology",
         "corrupt_traffic_box",
+        "duplicate_confidence",
+        "empty_predictions",
+        "empty_scene",
+        "partial_predictions",
         "perfect",
+        "permuted_order",
     }
     assert cases["perfect"]["expected_changed"] == ()
 
@@ -69,6 +76,13 @@ def test_file_loader_rejects_nonstandard_json_nan(tmp_path: Path) -> None:
     path = tmp_path / "nan.json"
     path.write_text('{"value":NaN}', encoding="utf-8")
     with pytest.raises(EvaluatorPayloadError, match="constant NaN"):
+        load_payload(path)
+
+
+def test_file_loader_rejects_duplicate_json_frame_keys(tmp_path: Path) -> None:
+    path = tmp_path / "duplicate.json"
+    path.write_text('{"ground_truth":{},"ground_truth":{}}', encoding="utf-8")
+    with pytest.raises(EvaluatorPayloadError, match="duplicate JSON object key"):
         load_payload(path)
 
 

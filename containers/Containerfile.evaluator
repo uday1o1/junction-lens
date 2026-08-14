@@ -11,22 +11,6 @@ ENV LANG=C.UTF-8 \
     PYTHONPATH=/opt/openlane-v2:/opt/junctionlens \
     SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 
-RUN sed -i \
-        -e 's|http://deb.debian.org/debian-security|https://snapshot.debian.org/archive/debian-security/20240926T000000Z|' \
-        -e 's|http://deb.debian.org/debian|https://snapshot.debian.org/archive/debian/20240926T000000Z|' \
-        /etc/apt/sources.list.d/debian.sources \
-    && apt-get -o Acquire::Check-Valid-Until=false update \
-    && apt-get install --yes --no-install-recommends \
-        libgl1=1.6.0-1 \
-        libglib2.0-0=2.74.6-2+deb12u3 \
-        libxcb1=1.15-1 \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -f \
-        /var/cache/ldconfig/aux-cache \
-        /var/log/apt/history.log \
-        /var/log/apt/term.log \
-        /var/log/dpkg.log
-
 COPY evaluator-requirements.lock /opt/build/evaluator-requirements.lock
 
 RUN python -m pip install \
@@ -50,7 +34,8 @@ COPY evaluator_payload.py evaluator_runner.py /opt/junctionlens/
 LABEL org.opencontainers.image.source="https://github.com/OpenDriveLab/OpenLane-V2" \
       org.opencontainers.image.version="2.1.0" \
       org.opencontainers.image.revision="d731a26bdbf34723dd915ad525c2c2eca19ed8a1" \
-      org.junctionlens.evaluator.ortools-deviation="9.3.10497-replaces-deleted-9.2.9972"
+      org.junctionlens.evaluator.ortools-deviation="9.3.10497-replaces-deleted-9.2.9972" \
+      org.junctionlens.evaluator.opencv-deviation="opencv-python-headless-5.0.0.93"
 
 USER 65532:65532
 ENTRYPOINT ["python", "/opt/junctionlens/evaluator_runner.py"]

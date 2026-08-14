@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import shutil
+import struct
 import subprocess
 import tempfile
 from collections.abc import Mapping
@@ -59,7 +61,124 @@ def inspect_evaluator_image(
         raise EvaluationError("local evaluator image identity differs from the OCI lock")
 
 
-def _validate_output(raw_output: str, expected_input_sha256: str) -> dict[str, Any]:
+_MATCHING_THRESHOLDS = {
+    "lane_segment": ("1.0", "2.0", "3.0"),
+    "traffic_element": ("0.75",),
+}
+
+
+def _float_list(value: object, label: str) -> list[float]:
+    if not isinstance(value, list):
+        raise EvaluationError(f"{label} must be an array")
+    result: list[float] = []
+    for item in value:
+        if isinstance(item, bool) or not isinstance(item, int | float):
+            raise EvaluationError(f"{label} contains a nonnumeric value")
+        number = float(item)
+        if not math.isfinite(number):
+            raise EvaluationError(f"{label} contains a nonfinite value")
+        result.append(number)
+    return result
+
+
+def _float32(value: float) -> float:
+    return float(struct.unpack("!f", struct.pack("!f", value))[0])
+
+
+def _validate_threshold_artifact(
+    artifact: object,
+    ground_items: list[dict[str, Any]],
+    prediction_items: list[dict[str, Any]],
+    label: str,
+) -> None:
+    if not isinstance(artifact, dict) or set(artifact) != {
+        "confidence",
+        "confidence_thresholds",
+        "ground_truth_ids",
+        "idx_match_gt",
+        "prediction_ids",
+    }:
+        raise EvaluationError(f"{label} has an invalid threshold artifact schema")
+    ground_ids = [item["id"] for item in ground_items]
+    prediction_ids = [item["id"] for item in prediction_items]
+    if artifact["ground_truth_ids"] != ground_ids:
+        raise EvaluationError(f"{label} ground-truth IDs differ from the trusted input")
+    if artifact["prediction_ids"] != prediction_ids:
+        raise EvaluationError(f"{label} prediction IDs differ from the trusted input")
+    confidence = _float_list(artifact["confidence"], f"{label} confidence")
+    expected_confidence = [_float32(float(item["confidence"])) for item in prediction_items]
+    if confidence != expected_confidence:
+        raise EvaluationError(f"{label} confidence differs from the trusted input")
+    thresholds = _float_list(artifact["confidence_thresholds"], f"{label} confidence thresholds")
+    if len(thresholds) != (10 if prediction_items else 0) or any(
+        threshold not in confidence for threshold in thresholds
+    ):
+        raise EvaluationError(f"{label} confidence thresholds are invalid")
+    indices = artifact["idx_match_gt"]
+    if not isinstance(indices, list) or len(indices) != len(prediction_items):
+        raise EvaluationError(f"{label} matched-index array has invalid length")
+    matched: list[int] = []
+    for value in indices:
+        if value is None:
+            continue
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int | float)
+            or not math.isfinite(float(value))
+            or not float(value).is_integer()
+            or not 0 <= int(value) < len(ground_items)
+        ):
+            raise EvaluationError(f"{label} contains an invalid matched index")
+        matched.append(int(value))
+    if len(matched) != len(set(matched)):
+        raise EvaluationError(f"{label} matches one ground-truth object more than once")
+
+
+def _validate_matching(value: object, payload: Mapping[str, Any]) -> None:
+    if not isinstance(value, dict) or set(value) != {
+        "frames",
+        "schema_version",
+        "thresholds",
+    }:
+        raise EvaluationError("official evaluator matching artifact has an invalid schema")
+    if value["schema_version"] != "openlane-v2.v2.1.threshold-matching.v1":
+        raise EvaluationError("official evaluator matching artifact version is unsupported")
+    if value["thresholds"] != {
+        "lane_segment": [1.0, 2.0, 3.0],
+        "traffic_element": [0.75],
+    }:
+        raise EvaluationError("official evaluator matching thresholds differ from v2.1")
+    frames = value["frames"]
+    ground_truth = payload["ground_truth"]
+    predictions = payload["predictions"]["results"]
+    if not isinstance(frames, dict) or set(frames) != set(ground_truth):
+        raise EvaluationError("official evaluator matching frame keys differ from the input")
+    for token in sorted(ground_truth):
+        frame = frames[token]
+        if not isinstance(frame, dict) or set(frame) != set(_MATCHING_THRESHOLDS):
+            raise EvaluationError(f"official evaluator matching frame {token} is incomplete")
+        truth = ground_truth[token]["annotation"]
+        prediction = predictions[token]["predictions"]
+        for object_type, threshold_names in _MATCHING_THRESHOLDS.items():
+            artifacts = frame[object_type]
+            if not isinstance(artifacts, dict) or set(artifacts) != set(threshold_names):
+                raise EvaluationError(
+                    f"official evaluator {object_type} thresholds differ from v2.1"
+                )
+            for threshold_name in threshold_names:
+                _validate_threshold_artifact(
+                    artifacts[threshold_name],
+                    truth[object_type],
+                    prediction[object_type],
+                    f"{token} {object_type} {threshold_name}",
+                )
+
+
+def validate_evaluator_output(
+    raw_output: str,
+    expected_input_sha256: str,
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
     try:
         value = json.loads(raw_output)
     except json.JSONDecodeError as error:
@@ -79,6 +198,8 @@ def _validate_output(raw_output: str, expected_input_sha256: str) -> dict[str, A
     environment = value["environment"]
     if not isinstance(environment, dict) or environment != {
         "numpy": "1.23.5",
+        "opencv": "5.0.0",
+        "opencv_distribution": "opencv-python-headless==5.0.0.93",
         "openlane_v2": "2.1.0",
         "ortools": "9.3.10497",
         "python": "3.8.20",
@@ -91,11 +212,51 @@ def _validate_output(raw_output: str, expected_input_sha256: str) -> dict[str, A
     if not isinstance(metrics, dict) or set(metrics) != expected_metrics:
         raise EvaluationError("official evaluator returned an incomplete metric set")
     for name, raw_metric in metrics.items():
-        if raw_metric is not None and not isinstance(raw_metric, int | float):
+        if raw_metric is not None and (
+            isinstance(raw_metric, bool)
+            or not isinstance(raw_metric, int | float)
+            or not math.isfinite(float(raw_metric))
+            or not 0.0 <= float(raw_metric) <= 1.0
+        ):
             raise EvaluationError(f"official evaluator metric {name} is invalid")
-    if not isinstance(value["matching"], dict):
-        raise EvaluationError("official evaluator matching artifact is invalid")
+    _validate_matching(value["matching"], payload)
     return value
+
+
+def evaluator_container_command(
+    docker: str,
+    reference: str,
+    mounted_input: Path,
+) -> list[str]:
+    """Build the one restricted invocation shared by production and parity checks."""
+    return [
+        docker,
+        "run",
+        "--rm",
+        "--platform",
+        "linux/amd64",
+        "--network",
+        "none",
+        "--read-only",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--pids-limit",
+        "64",
+        "--memory",
+        "1g",
+        "--cpus",
+        "2",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,nodev,size=64m",  # noqa: S108 - isolated container tmpfs
+        "--user",
+        "65532:65532",
+        "--mount",
+        f"type=bind,src={mounted_input},dst=/input/request.json,readonly",
+        reference,
+        "/input/request.json",
+    ]
 
 
 def evaluate_official(input_path: Path, root: Path) -> dict[str, Any]:
@@ -104,7 +265,7 @@ def evaluate_official(input_path: Path, root: Path) -> dict[str, Any]:
     input_path = input_path.resolve(strict=True)
     raw_bytes = input_path.read_bytes()
     try:
-        parse_payload_bytes(raw_bytes)
+        payload = parse_payload_bytes(raw_bytes)
     except (EvaluatorPayloadError, OSError) as error:
         raise EvaluationError(str(error)) from error
     contract = load_evaluator_image_contract(root)
@@ -128,34 +289,7 @@ def evaluate_official(input_path: Path, root: Path) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="request-", dir=cache_root) as temp:
         mounted_input = Path(temp) / "request.json"
         mounted_input.write_bytes(raw_bytes)
-        command = [
-            _docker(),
-            "run",
-            "--rm",
-            "--platform",
-            "linux/amd64",
-            "--network",
-            "none",
-            "--read-only",
-            "--cap-drop",
-            "ALL",
-            "--security-opt",
-            "no-new-privileges",
-            "--pids-limit",
-            "64",
-            "--memory",
-            "1g",
-            "--cpus",
-            "2",
-            "--tmpfs",
-            "/tmp:rw,noexec,nosuid,nodev,size=64m",  # noqa: S108 - isolated container tmpfs
-            "--user",
-            "65532:65532",
-            "--mount",
-            f"type=bind,src={mounted_input},dst=/input/request.json,readonly",
-            reference,
-            "/input/request.json",
-        ]
+        command = evaluator_container_command(_docker(), reference, mounted_input)
         result = subprocess.run(
             command,
             cwd=root,
@@ -169,4 +303,4 @@ def evaluate_official(input_path: Path, root: Path) -> dict[str, Any]:
         raise EvaluationError(
             f"official evaluator failed with exit code {result.returncode}: {detail}"
         )
-    return _validate_output(result.stdout, input_sha256)
+    return validate_evaluator_output(result.stdout, input_sha256, payload)

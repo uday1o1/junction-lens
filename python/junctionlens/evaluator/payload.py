@@ -266,7 +266,11 @@ def parse_payload_bytes(raw_bytes: bytes) -> dict[str, Any]:
         raise EvaluatorPayloadError(f"input must be no larger than {MAX_INPUT_BYTES} bytes")
     try:
         source = raw_bytes.decode("utf-8")
-        value = json.loads(source, parse_constant=lambda value: _reject_constant(value))
+        value = json.loads(
+            source,
+            object_pairs_hook=_object_without_duplicate_keys,
+            parse_constant=lambda value: _reject_constant(value),
+        )
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise EvaluatorPayloadError(f"input is not valid strict UTF-8 JSON: {error}") from error
     return validate_payload(value)
@@ -274,3 +278,12 @@ def parse_payload_bytes(raw_bytes: bytes) -> dict[str, Any]:
 
 def _reject_constant(value: str) -> None:
     raise EvaluatorPayloadError(f"JSON constant {value} is not permitted")
+
+
+def _object_without_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise EvaluatorPayloadError(f"duplicate JSON object key is not permitted: {key}")
+        result[key] = value
+    return result

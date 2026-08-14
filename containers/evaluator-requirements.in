@@ -7,7 +7,8 @@ matplotlib
 numpy>=1.22.0,<1.24.0
 scikit-learn
 similaritymeasures
-opencv-python
+# The evaluator imports cv2 but has no GUI path; see ADR 0004.
+opencv-python-headless==5.0.0.93
 scipy==1.8.0
 # 9.2.9972 was deleted from the live PyPI index; see ADR 0004.
 ortools==9.3.10497

@@ -8,9 +8,11 @@ import json
 import math
 import platform
 import sys
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
+import cv2
 import numpy as np
 import scipy
 import shapely
@@ -34,8 +36,14 @@ def _numpy_annotations(annotation: dict[str, Any]) -> dict[str, Any]:
         area["points"] = np.asarray(area["points"], dtype=np.float64)
         if "confidence" in area:
             area["confidence"] = np.float32(area["confidence"])
-    annotation["topology_lsls"] = np.asarray(annotation["topology_lsls"], dtype=np.float64)
-    annotation["topology_lste"] = np.asarray(annotation["topology_lste"], dtype=np.float64)
+    lane_count = len(annotation["lane_segment"])
+    traffic_count = len(annotation["traffic_element"])
+    annotation["topology_lsls"] = np.asarray(annotation["topology_lsls"], dtype=np.float64).reshape(
+        (lane_count, lane_count)
+    )
+    annotation["topology_lste"] = np.asarray(annotation["topology_lste"], dtype=np.float64).reshape(
+        (lane_count, traffic_count)
+    )
     return annotation
 
 
@@ -54,10 +62,11 @@ def _normalize(value: Any) -> Any:
     raise TypeError(f"unsupported evaluator result type: {type(value).__name__}")
 
 
-def _matching(predictions: dict[str, Any]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
+def _matching(ground_truth: dict[str, Any], predictions: dict[str, Any]) -> dict[str, Any]:
+    frames: dict[str, Any] = {}
     for token, frame in sorted(predictions["results"].items()):
         annotation = frame["predictions"]
+        truth = ground_truth[token]["annotation"]
         frame_matches: dict[str, Any] = {}
         for object_type, thresholds in {
             "lane_segment": (1.0, 2.0, 3.0),
@@ -69,11 +78,22 @@ def _matching(predictions: dict[str, Any]) -> dict[str, Any]:
                 object_matches[str(threshold)] = {
                     "confidence": annotation[f"{prefix}_confidence"],
                     "confidence_thresholds": annotation[f"{prefix}_confidence_thresholds"],
+                    "ground_truth_ids": [item["id"] for item in truth[object_type]],
                     "idx_match_gt": annotation[f"{prefix}_idx_match_gt"],
+                    "prediction_ids": [item["id"] for item in annotation[object_type]],
                 }
             frame_matches[object_type] = object_matches
-        result[token] = frame_matches
-    return _normalize(result)
+        frames[token] = frame_matches
+    return _normalize(
+        {
+            "frames": frames,
+            "schema_version": "openlane-v2.v2.1.threshold-matching.v1",
+            "thresholds": {
+                "lane_segment": [1.0, 2.0, 3.0],
+                "traffic_element": [0.75],
+            },
+        }
+    )
 
 
 def run(path: Path) -> dict[str, Any]:
@@ -89,6 +109,8 @@ def run(path: Path) -> dict[str, Any]:
     return {
         "environment": {
             "numpy": np.__version__,
+            "opencv": cv2.__version__,
+            "opencv_distribution": f"opencv-python-headless=={version('opencv-python-headless')}",
             "openlane_v2": "2.1.0",
             "ortools": ortools_version,
             "python": platform.python_version(),
@@ -96,7 +118,7 @@ def run(path: Path) -> dict[str, Any]:
             "shapely": shapely.__version__,
         },
         "input_sha256": hashlib.sha256(raw_bytes).hexdigest(),
-        "matching": _matching(predictions),
+        "matching": _matching(ground_truth, predictions),
         "metrics": {
             "DET_a": _normalize(official["DET_a"]),
             "DET_l": _normalize(official["DET_l"]),
