@@ -1,0 +1,37 @@
+schema_version: junctionlens.official-evaluator-cases.v1
+base: perfect.json
+cases:
+  perfect:
+    replacements: []
+    expected_changed: []
+    expected_metrics: {DET_a: 1.0, DET_l: 1.0, DET_t: 1.0, OLUS: 1.0, TOP_ll: 1.0, TOP_lt: 1.0}
+  corrupt_lane_geometry:
+    replacements:
+      - path: /predictions/results/segment-001~1frame-0001/predictions/lane_segment/0/centerline
+        value: [[20.0, 0.0, 0.0], [20.0, 5.0, 0.0], [20.0, 10.0, 0.0]]
+    expected_changed: [DET_l]
+    expected_metrics: {DET_a: 1.0, DET_l: 0.27272728085517883, DET_t: 1.0, OLUS: 0.5911714663838304, TOP_ll: 0.0, TOP_lt: 0.4666666666666667}
+  corrupt_area_geometry:
+    replacements:
+      - path: /predictions/results/segment-001~1frame-0001/predictions/area/0/points
+        value: [[20.0, 20.0, 0.0], [22.0, 20.0, 0.0], [22.0, 22.0, 0.0], [20.0, 22.0, 0.0]]
+    expected_changed: [DET_a]
+    expected_metrics: {DET_a: 0.5, DET_l: 1.0, DET_t: 1.0, OLUS: 0.9, TOP_ll: 1.0, TOP_lt: 1.0}
+  corrupt_traffic_box:
+    replacements:
+      - path: /predictions/results/segment-001~1frame-0001/predictions/traffic_element/0/points
+        value: [[200.0, 200.0], [205.0, 205.0]]
+    expected_changed: [DET_t]
+    expected_metrics: {DET_a: 1.0, DET_l: 1.0, DET_t: 0.9230769276618958, OLUS: 0.9768454064770301, TOP_ll: 1.0, TOP_lt: 0.9238095238095237}
+  corrupt_lane_topology:
+    replacements:
+      - path: /predictions/results/segment-001~1frame-0001/predictions/topology_lsls/0/1
+        value: 0.01
+    expected_changed: [TOP_ll]
+    expected_metrics: {DET_a: 1.0, DET_l: 1.0, DET_t: 1.0, OLUS: 0.9414213538169861, TOP_ll: 0.5, TOP_lt: 1.0}
+  corrupt_control_topology:
+    replacements:
+      - path: /predictions/results/segment-001~1frame-0001/predictions/topology_lste/0/0
+        value: 0.01
+    expected_changed: [TOP_lt]
+    expected_metrics: {DET_a: 1.0, DET_l: 1.0, DET_t: 1.0, OLUS: 0.992230020944651, TOP_ll: 1.0, TOP_lt: 0.9238095238095237}

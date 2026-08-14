@@ -3,6 +3,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.hypothesis/
 .mypy_cache/
 .ruff_cache/
 .coverage
@@ -27,7 +28,7 @@ build-*/
 /engines/
 /profiles/
 /private-thumbnails/
-.junctionlens/license-acknowledgments/
+/.junctionlens/
 
 # Machine-local configuration
 .env

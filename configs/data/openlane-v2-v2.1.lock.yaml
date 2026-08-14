@@ -19,7 +19,7 @@ acknowledgment_receipt: .junctionlens/license-acknowledgments/openlane-v2-v2.1.j
 redistribution_allowed: false
 adapter:
   version: "0.1.0"
-  preprocessing_config_sha256: null
+  preprocessing_config_sha256: 9e86d9db05bd2c98229341d08e6111d8c3a07421bbce7ad958acf6b6da9fb314
 camera_slot_mappings:
   nuscenes:
     CAM_FRONT: FRONT_CENTER

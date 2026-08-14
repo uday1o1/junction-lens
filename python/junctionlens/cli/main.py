@@ -8,13 +8,16 @@ from typing import Annotated
 
 import typer
 
+from junctionlens.cli.data import data_app
 from junctionlens.doctor.service import run_doctor
+from junctionlens.evaluator import EvaluationError, evaluate_official
 
 app = typer.Typer(
     name="junctionlens",
     help="Control-aware road-scene graph development and release evidence.",
     no_args_is_help=True,
 )
+app.add_typer(data_app, name="data")
 
 
 @app.callback()
@@ -48,6 +51,26 @@ def doctor_command(
             )
     if not report.readiness.local_cpu:
         raise typer.Exit(code=2)
+
+
+@app.command("evaluate")
+def evaluate_command(
+    input_path: Annotated[
+        Path,
+        typer.Option("--input", exists=True, dir_okay=False, resolve_path=True),
+    ],
+    project_root: Annotated[
+        Path,
+        typer.Option(hidden=True, exists=True, file_okay=False, dir_okay=True, resolve_path=True),
+    ] = Path(),
+) -> None:
+    """Compute official metrics in the isolated compatibility image."""
+    try:
+        result = evaluate_official(input_path, project_root)
+    except (EvaluationError, OSError, ValueError) as error:
+        typer.echo(f"evaluation error: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    typer.echo(json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False))
 
 
 if __name__ == "__main__":

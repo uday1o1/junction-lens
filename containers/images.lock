@@ -41,6 +41,14 @@ application_images:
   cpu:
     digest: null
     state: PENDING_REPRODUCIBLE_BUILD
+  official_evaluator:
+    build_context_sha256: 6450f0873af1e2b804be9853270fc1869aceaa0d112cd6f3a555bcf84d696bec
+    config_sha256: cd746a5bcc4e0560bc65c0e024b6bb42aaf439f0aebcbb9996233e6babe957d6
+    local_reference: junctionlens/official-evaluator:v2.1.0
+    oci_index_sha256: 5c3854bffbfe54ad99ca00a0c098aa471e8ae1454437cd6fa923402fdc85a6af
+    platform_manifest_sha256: b3bacc7e4981c51dfc9e0540af6b6cdfe4a077b17209de2807f7c6ef5309ff11
+    source_date_epoch: 1698810385
+    state: ACCEPTED_LOCAL
   gpu:
     digest: null
     state: DEFERRED_HARDWARE

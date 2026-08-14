@@ -22,8 +22,11 @@ Milestone 0 commands:
   test-cpp
   test-python
   test-contract
+  build-evaluator [--check-lock]
+  test-evaluator
   verify-locks [--online]
   verify-m0-1
+  verify-m0-2-local
 EOF
 }
 
@@ -49,11 +52,11 @@ case "$JL_COMMAND" in
     uv run --locked junctionlens doctor "$@"
     ;;
   format-check)
-    uv run --locked ruff format --check python tests scripts
+    uv run --locked ruff format --check python tests scripts containers/evaluator_runner.py
     pnpm exec prettier --check package.json pnpm-workspace.yaml
     ;;
   lint)
-    uv run --locked ruff check python tests scripts
+    uv run --locked ruff check python tests scripts containers/evaluator_runner.py
     ;;
   typecheck)
     uv run --locked mypy
@@ -66,6 +69,12 @@ case "$JL_COMMAND" in
     ;;
   test-contract)
     uv run --locked pytest tests/contract "$@"
+    ;;
+  build-evaluator)
+    uv run --locked python scripts/containers/build_evaluator.py "$@"
+    ;;
+  test-evaluator)
+    uv run --locked python scripts/containers/verify_evaluator.py "$@"
     ;;
   verify-locks)
     uv run --locked python -m junctionlens.locks.verify "$@"
@@ -83,6 +92,11 @@ case "$JL_COMMAND" in
     "$0" test-cpp
     "$0" test-python
     "$0" doctor --json
+    ;;
+  verify-m0-2-local)
+    "$0" verify-m0-1
+    "$0" build-evaluator --check-lock
+    "$0" test-evaluator
     ;;
   -h|--help|help)
     usage

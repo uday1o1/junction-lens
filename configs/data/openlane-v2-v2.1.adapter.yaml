@@ -1,0 +1,49 @@
+schema_version: "1.0.0"
+adapter_version: "0.1.0"
+dataset_id: openlane-v2-v2.1
+schema_mode: lane-segment-v2.1
+coordinate_contract:
+  source_axes: x-right-y-forward-z-up
+  target_axes: x-forward-y-left-z-up
+  transform_direction: T_target_source
+camera_slots:
+  - FRONT_CENTER
+  - FRONT_LEFT
+  - FRONT_RIGHT
+  - SIDE_LEFT
+  - SIDE_RIGHT
+  - REAR_LEFT
+  - REAR_CENTER
+  - REAR_RIGHT
+source_camera_mappings:
+  nuscenes:
+    CAM_FRONT: FRONT_CENTER
+    CAM_FRONT_LEFT: FRONT_LEFT
+    CAM_FRONT_RIGHT: FRONT_RIGHT
+    CAM_BACK_LEFT: REAR_LEFT
+    CAM_BACK: REAR_CENTER
+    CAM_BACK_RIGHT: REAR_RIGHT
+  argoverse2:
+    ring_front_center: FRONT_CENTER
+    ring_front_left: FRONT_LEFT
+    ring_front_right: FRONT_RIGHT
+    ring_side_left: SIDE_LEFT
+    ring_side_right: SIDE_RIGHT
+    ring_rear_left: REAR_LEFT
+    ring_rear_right: REAR_RIGHT
+model_image:
+  height: 384
+  width: 640
+  color_order: RGB
+  resize_policy: letterbox-fit
+  interpolation: bilinear
+  pad_value: 0
+query_capacities:
+  lane_segment: 96
+  traffic_element: 64
+  area: 32
+capacity_required_coverage: 0.999
+identity_audit:
+  lane_world_centroid_jump_m: 50.0
+  area_world_centroid_jump_m: 50.0
+  traffic_normalized_center_jump: 0.5

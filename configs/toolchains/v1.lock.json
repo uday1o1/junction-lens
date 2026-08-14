@@ -86,6 +86,25 @@
           "url": "https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-linux-x86_64.zip"
         }
       }
+    },
+    "docker-buildx": {
+      "version": "0.34.1",
+      "assets": {
+        "darwin-arm64": {
+          "archive_type": "binary",
+          "binary_name": "docker-buildx",
+          "sha256": "25ac23312414f08cca153177e6222a9fa6074cf6ea94c5277ef5a8681ec65dae",
+          "strip_components": 0,
+          "url": "https://github.com/docker/buildx-desktop/releases/download/v0.34.1-desktop.1/buildx-v0.34.1-desktop.1.darwin-arm64"
+        },
+        "linux-x86_64": {
+          "archive_type": "binary",
+          "binary_name": "docker-buildx",
+          "sha256": "f1332ddb9010bd0b72628266c3a906d9a6979848033df4c8d9bd2cd113bae12b",
+          "strip_components": 0,
+          "url": "https://github.com/docker/buildx/releases/download/v0.34.1/buildx-v0.34.1.linux-amd64"
+        }
+      }
     }
   }
 }

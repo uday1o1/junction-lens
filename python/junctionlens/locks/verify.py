@@ -150,6 +150,23 @@ def _validate_images(payload: Mapping[str, Any]) -> None:
         "emsdk",
     }:
         raise LockVerificationError("ONNX Runtime recursive source identities are incomplete")
+    applications = payload.get("application_images")
+    if not isinstance(applications, dict):
+        raise LockVerificationError("application image lock is missing")
+    evaluator = applications.get("official_evaluator")
+    if not isinstance(evaluator, dict) or evaluator.get("state") != "ACCEPTED_LOCAL":
+        raise LockVerificationError("official evaluator image is not accepted locally")
+    for field in (
+        "build_context_sha256",
+        "config_sha256",
+        "oci_index_sha256",
+        "platform_manifest_sha256",
+    ):
+        _require_hash(evaluator.get(field), _SHA256, f"official evaluator {field}")
+    if evaluator.get("local_reference") != "junctionlens/official-evaluator:v2.1.0":
+        raise LockVerificationError("official evaluator local reference is not frozen")
+    if evaluator.get("source_date_epoch") != 1698810385:
+        raise LockVerificationError("official evaluator source epoch is not frozen")
 
 
 def _cmake_sources(path: Path) -> list[tuple[str, str, str]]:
@@ -191,9 +208,12 @@ def _verify_tool_archives(root: Path, toolchains: Mapping[str, Any]) -> None:
     tools = toolchains["tools"]
     for name, spec in tools.items():
         for platform_name, asset in spec["assets"].items():
-            suffix = {"tar.gz": ".tar.gz", "tar.xz": ".tar.xz", "zip": ".zip"}[
-                asset["archive_type"]
-            ]
+            suffix = {
+                "binary": ".bin",
+                "tar.gz": ".tar.gz",
+                "tar.xz": ".tar.xz",
+                "zip": ".zip",
+            }[asset["archive_type"]]
             cache = (
                 root
                 / ".cache/lock-verification"

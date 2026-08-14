@@ -52,7 +52,12 @@ def _load_lock(root: Path) -> Mapping[str, Any]:
 
 def _archive_suffix(asset: Mapping[str, Any]) -> str:
     archive_type = str(asset["archive_type"])
-    return {"tar.gz": ".tar.gz", "tar.xz": ".tar.xz", "zip": ".zip"}[archive_type]
+    return {
+        "binary": ".bin",
+        "tar.gz": ".tar.gz",
+        "tar.xz": ".tar.xz",
+        "zip": ".zip",
+    }[archive_type]
 
 
 def install_tool(root: Path, name: str, spec: Mapping[str, Any], key: str) -> Path:
@@ -71,7 +76,12 @@ def install_tool(root: Path, name: str, spec: Mapping[str, Any], key: str) -> Pa
     try:
         archive_type = str(asset["archive_type"])
         strip_components = int(asset["strip_components"])
-        if archive_type in {"tar.gz", "tar.xz"}:
+        if archive_type == "binary":
+            binary_name = str(asset["binary_name"])
+            destination = staging / binary_name
+            shutil.copyfile(archive, destination)
+            destination.chmod(0o755)
+        elif archive_type in {"tar.gz", "tar.xz"}:
             extract_tar_safely(archive, staging, strip_components)
         elif archive_type == "zip":
             extract_zip_safely(archive, staging, strip_components)
@@ -127,6 +137,7 @@ def bootstrap(sync: bool) -> None:
     _link_binary(root, installed["cmake"], "ctest", "bin/ctest")
     _link_binary(root, installed["ninja"], "ninja", "ninja")
     _link_binary(root, installed["protoc"], "protoc", "bin/protoc")
+    _link_binary(root, installed["docker-buildx"], "docker-buildx", "docker-buildx")
     _link_binary(root, installed["node"], "node", "bin/node")
     _link_binary(root, installed["node"], "npm", "bin/npm")
     _link_binary(root, installed["node"], "npx", "bin/npx")

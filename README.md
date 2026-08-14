@@ -7,3 +7,21 @@ The first verified workflow is established in Milestone 0.
 Measured model, runtime, and release claims will be added only after their named evidence gates pass.
 
 JunctionLens is not a vehicle controller, a safety case, or a certification product.
+
+## Verified local bootstrap
+
+```sh
+./tools/jl bootstrap-cpu
+./tools/jl verify-m0-1
+```
+
+The command uses repository-locked CPU toolchains and dependencies.
+`junctionlens doctor --json` reports absent dataset, GPU, CUDA, and TensorRT capabilities separately instead of assuming they exist.
+
+## Dataset and official metrics
+
+Licensed OpenLane-V2 data is never downloaded automatically or committed to this repository.
+See [Dataset and license boundary](docs/dataset-and-license.md) for the explicit acknowledgment, checksum registration, and audit workflow.
+
+The official metric path runs the untouched OpenLane-V2 v2.1 evaluator in a reproducible restricted Python 3.8 image.
+See [Official evaluator compatibility](docs/evaluator-compatibility.md) for its trust boundary, exact build command, and repository-owned corruption evidence.
