@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from junctionlens.data.geometry import (
@@ -64,6 +64,7 @@ def test_openlane_basis_change_axis_goldens() -> None:
         max_size=16,
     )
 )
+@settings(suppress_health_check=[HealthCheck.too_slow])
 def test_basis_change_inverse_round_trip(points: list[tuple[float, float, float]]) -> None:
     """The declared source and canonical bases are exact inverses."""
     source = np.asarray(points, dtype=np.float64)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -119,6 +120,32 @@ def _validate_dataset(payload: Mapping[str, Any]) -> None:
         raise LockVerificationError("dataset MD5 set differs from the pinned official data page")
 
 
+def _validate_adapter_lock(root: Path, dataset: Mapping[str, Any]) -> None:
+    adapter_lock = dataset.get("adapter")
+    if not isinstance(adapter_lock, dict) or set(adapter_lock) != {
+        "preprocessing_config_sha256",
+        "version",
+    }:
+        raise LockVerificationError("dataset adapter lock is incomplete")
+    config_path = root / "configs/data/openlane-v2-v2.1.adapter.yaml"
+    config_bytes = config_path.read_bytes()
+    observed_sha256 = hashlib.sha256(config_bytes).hexdigest()
+    locked_sha256 = _require_hash(
+        adapter_lock.get("preprocessing_config_sha256"),
+        _SHA256,
+        "OpenLane adapter config sha256",
+    )
+    if observed_sha256 != locked_sha256:
+        raise LockVerificationError("OpenLane adapter config differs from its dataset lock")
+    config = _load_yaml(config_path)
+    if config.get("adapter_version") != adapter_lock.get("version"):
+        raise LockVerificationError("OpenLane adapter version differs from its dataset lock")
+    if config.get("schema_mode") != dataset.get("schema_mode"):
+        raise LockVerificationError("OpenLane adapter schema mode differs from its dataset lock")
+    if config.get("source_camera_mappings") != dataset.get("camera_slot_mappings"):
+        raise LockVerificationError("OpenLane camera mappings differ from their dataset lock")
+
+
 def _validate_images(payload: Mapping[str, Any]) -> None:
     if payload.get("platform") != "linux/amd64":
         raise LockVerificationError("image lock must target linux/amd64")
@@ -183,7 +210,9 @@ def _cmake_sources(path: Path) -> list[tuple[str, str, str]]:
 def validate_lock_set(root: Path) -> None:
     """Validate every lock structurally without network access."""
     _validate_toolchains(_load_json(root / "configs/toolchains/v1.lock.json"))
-    _validate_dataset(_load_yaml(root / "configs/data/openlane-v2-v2.1.lock.yaml"))
+    dataset = _load_yaml(root / "configs/data/openlane-v2-v2.1.lock.yaml")
+    _validate_dataset(dataset)
+    _validate_adapter_lock(root, dataset)
     _validate_images(_load_yaml(root / "containers/images.lock"))
     _cmake_sources(root / "cmake/dependencies.cmake")
 

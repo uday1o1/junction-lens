@@ -29,7 +29,7 @@ def _docker() -> str:
     return executable
 
 
-def _load_image_contract(root: Path) -> Mapping[str, Any]:
+def load_evaluator_image_contract(root: Path) -> Mapping[str, Any]:
     with (root / "containers/images.lock").open(encoding="utf-8") as source:
         payload = yaml.safe_load(source)
     try:
@@ -41,7 +41,7 @@ def _load_image_contract(root: Path) -> Mapping[str, Any]:
     return evaluator
 
 
-def _inspect_image(
+def inspect_evaluator_image(
     root: Path, reference: str, expected_config: str, expected_manifest: str
 ) -> None:
     result = subprocess.run(
@@ -107,9 +107,9 @@ def evaluate_official(input_path: Path, root: Path) -> dict[str, Any]:
         parse_payload_bytes(raw_bytes)
     except (EvaluatorPayloadError, OSError) as error:
         raise EvaluationError(str(error)) from error
-    contract = _load_image_contract(root)
+    contract = load_evaluator_image_contract(root)
     reference = str(contract["local_reference"])
-    _inspect_image(
+    inspect_evaluator_image(
         root,
         reference,
         str(contract["config_sha256"]),

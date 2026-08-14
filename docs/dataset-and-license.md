@@ -38,11 +38,15 @@ uv run --locked junctionlens data register \
   --archive /path/to/OpenLane-V2_sample.tar
 
 uv run --locked junctionlens data audit --profile sample
+
+uv run --locked junctionlens data verify-adapter --profile sample
 ```
 
 Registration fails closed for a missing acknowledgment, checksum mismatch, missing manifest, changed root, or unsafe receipt path.
 The audit loads raw `-ls.json` files directly and never accepts an upstream pickle across the application trust boundary.
 It reports query-capacity coverage and separate lane, traffic-control, and road-area identity evidence.
+The adapter parity command compares the frozen sample selector with the pinned official v2.1 devkit inside the locked compatibility image.
+It emits hashes and aggregate numeric error only, so restricted annotations do not become repository artifacts.
 
 ## Frozen normalization
 

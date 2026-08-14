@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+import numpy as np
+import numpy.typing as npt
+
 Point2 = tuple[float, float]
 Point3 = tuple[float, float, float]
 Matrix3 = tuple[
@@ -48,6 +51,17 @@ class FrameKey:
     source_domain: str
     calibration_sha256: str
     frame_manifest_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class SourceDomainMetadata:
+    """Lossless upstream identity plus the normalized source-domain key."""
+
+    source_name: str
+    source_segment_id: str
+    normalized_domain: str
+    metadata_version: str
+    schema_mode: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,13 +127,61 @@ class RoadArea:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelCameraInputs:
+    """One frame of immutable model-ready camera tensors in canonical slot order."""
+
+    images: npt.NDArray[np.float32]
+    camera_valid: npt.NDArray[np.bool_]
+    intrinsics: npt.NDArray[np.float32]
+    t_vehicle_camera: npt.NDArray[np.float32]
+
+    def __post_init__(self) -> None:
+        expected_cameras = len(CAMERA_SLOTS)
+        if self.images.shape != (expected_cameras, 3, 384, 640):
+            raise ValueError("images must have shape [8, 3, 384, 640]")
+        if self.camera_valid.shape != (expected_cameras,):
+            raise ValueError("camera_valid must have shape [8]")
+        if self.intrinsics.shape != (expected_cameras, 3, 3):
+            raise ValueError("intrinsics must have shape [8, 3, 3]")
+        if self.t_vehicle_camera.shape != (expected_cameras, 4, 4):
+            raise ValueError("t_vehicle_camera must have shape [8, 4, 4]")
+        if self.images.dtype != np.float32:
+            raise ValueError("images must use float32")
+        if self.camera_valid.dtype != np.bool_:
+            raise ValueError("camera_valid must use bool")
+        if self.intrinsics.dtype != np.float32 or self.t_vehicle_camera.dtype != np.float32:
+            raise ValueError("calibration tensors must use float32")
+        if not all(
+            np.isfinite(array).all()
+            for array in (self.images, self.intrinsics, self.t_vehicle_camera)
+        ):
+            raise ValueError("model camera inputs contain a nonfinite value")
+        invalid = ~self.camera_valid
+        if bool(invalid.any()) and not (
+            np.count_nonzero(self.images[invalid]) == 0
+            and np.count_nonzero(self.intrinsics[invalid]) == 0
+            and np.count_nonzero(self.t_vehicle_camera[invalid]) == 0
+        ):
+            raise ValueError("invalid camera slots must contain zero tensors")
+        for array in (
+            self.images,
+            self.camera_valid,
+            self.intrinsics,
+            self.t_vehicle_camera,
+        ):
+            array.setflags(write=False)
+
+
+@dataclass(frozen=True, slots=True)
 class AdaptedFrame:
     """One immutable normalized frame produced from OpenLane source JSON."""
 
     key: FrameKey
+    source_metadata: SourceDomainMetadata
     cameras: tuple[CameraFrame, ...]
     t_world_vehicle: Matrix4
     pose_valid: bool
+    annotations_valid: bool
     adapter_version: str
     lanes: tuple[LaneSegment, ...]
     traffic_controls: tuple[TrafficControl, ...]
@@ -140,3 +202,12 @@ class AdaptedFrame:
             len(row) != traffic_count for row in self.topology_lane_traffic
         ):
             raise ValueError("lane-traffic topology shape does not match node counts")
+        if self.key.source_domain != self.source_metadata.normalized_domain:
+            raise ValueError("frame key and source metadata domains disagree")
+        for label, identifiers in {
+            "lane": [lane.source_object_id for lane in self.lanes],
+            "traffic control": [control.source_object_id for control in self.traffic_controls],
+            "road area": [area.source_object_id for area in self.road_areas],
+        }.items():
+            if len(identifiers) != len(set(identifiers)):
+                raise ValueError(f"duplicate {label} source object ID")

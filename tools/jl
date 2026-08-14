@@ -30,6 +30,7 @@ Repository commands:
   generate-synthetic [--output DIR]
   verify-synthetic [--root DIR]
   test-integration-synthetic
+  test-integration-data
   test-web
   build-evaluator [--check-lock]
   test-evaluator
@@ -45,6 +46,7 @@ Repository commands:
   verify-m1-1
   verify-m1-2
   verify-m1-3
+  verify-m2-1-local
 EOF
 }
 
@@ -88,12 +90,14 @@ case "$JL_COMMAND" in
       -exec "$JL_CLANG_FORMAT" --dry-run --Werror {} +
     ;;
   format-check)
-    uv run --locked ruff format --check python tests scripts containers/evaluator_runner.py
+    uv run --locked ruff format --check \
+      python tests scripts containers/evaluator_runner.py containers/adapter_parity_runner.py
     "$0" format-cpp-check
     pnpm run format:check
     ;;
   lint)
-    uv run --locked ruff check python tests scripts containers/evaluator_runner.py
+    uv run --locked ruff check \
+      python tests scripts containers/evaluator_runner.py containers/adapter_parity_runner.py
     ;;
   typecheck)
     uv run --locked mypy
@@ -132,6 +136,14 @@ case "$JL_COMMAND" in
     uv run --locked pytest \
       "$JL_ROOT/tests/unit/test_synthetic_generator.py" \
       "$JL_ROOT/tests/integration/test_synthetic_cli.py" \
+      "$@"
+    ;;
+  test-integration-data)
+    uv run --locked pytest \
+      "$JL_ROOT/tests/unit/test_openlane_adapter.py" \
+      "$JL_ROOT/tests/unit/test_openlane_parity.py" \
+      "$JL_ROOT/tests/security/test_adapter_parity_container.py" \
+      "$JL_ROOT/tests/integration/test_data_cli.py" \
       "$@"
     ;;
   test-web)
@@ -213,6 +225,11 @@ case "$JL_COMMAND" in
     "$0" verify-m1-2
     "$0" test-integration-synthetic
     "$0" verify-synthetic
+    ;;
+  verify-m2-1-local)
+    "$0" verify-m1-3
+    "$0" verify-locks
+    "$0" test-integration-data
     ;;
   -h|--help|help)
     usage

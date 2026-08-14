@@ -18,8 +18,8 @@ acknowledgment_required: true
 acknowledgment_receipt: .junctionlens/license-acknowledgments/openlane-v2-v2.1.json
 redistribution_allowed: false
 adapter:
-  version: "0.1.0"
-  preprocessing_config_sha256: 9e86d9db05bd2c98229341d08e6111d8c3a07421bbce7ad958acf6b6da9fb314
+  version: "0.2.0"
+  preprocessing_config_sha256: db76ee316c53df55428c8f3acac3dccf36c715cbc72e2c4a9f05decd2e440e65
 camera_slot_mappings:
   nuscenes:
     CAM_FRONT: FRONT_CENTER

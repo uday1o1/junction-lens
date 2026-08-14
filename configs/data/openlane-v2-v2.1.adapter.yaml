@@ -1,5 +1,5 @@
 schema_version: "1.0.0"
-adapter_version: "0.1.0"
+adapter_version: "0.2.0"
 dataset_id: openlane-v2-v2.1
 schema_mode: lane-segment-v2.1
 coordinate_contract:
@@ -31,6 +31,22 @@ source_camera_mappings:
     ring_side_right: SIDE_RIGHT
     ring_rear_left: REAR_LEFT
     ring_rear_right: REAR_RIGHT
+source_image_dimensions:
+  nuscenes:
+    CAM_FRONT: [1600, 900]
+    CAM_FRONT_LEFT: [1600, 900]
+    CAM_FRONT_RIGHT: [1600, 900]
+    CAM_BACK_LEFT: [1600, 900]
+    CAM_BACK: [1600, 900]
+    CAM_BACK_RIGHT: [1600, 900]
+  argoverse2:
+    ring_front_center: [1550, 2048]
+    ring_front_left: [2048, 1550]
+    ring_front_right: [2048, 1550]
+    ring_side_left: [2048, 1550]
+    ring_side_right: [2048, 1550]
+    ring_rear_left: [2048, 1550]
+    ring_rear_right: [2048, 1550]
 model_image:
   height: 384
   width: 640
@@ -38,6 +54,8 @@ model_image:
   resize_policy: letterbox-fit
   interpolation: bilinear
   pad_value: 0
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
 query_capacities:
   lane_segment: 96
   traffic_element: 64

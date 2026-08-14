@@ -33,3 +33,15 @@ def test_dataset_validator_rejects_checksum_drift() -> None:
     corrupted["archives"][0]["published_md5"] = "0" * 32
     with pytest.raises(verify.LockVerificationError, match="differs from the pinned official"):
         verify._validate_dataset(corrupted)
+
+
+def test_adapter_lock_rejects_seeded_config_hash_drift(tmp_path: Path) -> None:
+    """A changed preprocessing contract cannot retain an old reproducibility identity."""
+    source_root = Path.cwd()
+    config_relative = Path("configs/data/openlane-v2-v2.1.adapter.yaml")
+    copied_config = tmp_path / config_relative
+    copied_config.parent.mkdir(parents=True)
+    copied_config.write_bytes((source_root / config_relative).read_bytes() + b"# drift\n")
+    dataset = verify._load_yaml(source_root / "configs/data/openlane-v2-v2.1.lock.yaml")
+    with pytest.raises(verify.LockVerificationError, match="config differs"):
+        verify._validate_adapter_lock(tmp_path, dataset)
