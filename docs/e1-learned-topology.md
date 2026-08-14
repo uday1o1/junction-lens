@@ -61,4 +61,4 @@ Run the complete local package gate with:
 ./tools/jl verify-m5-1-local
 ```
 
-The licensed full-corpus E1 experiment and E0 comparison remain the separate M5.2 target gate.
+The licensed full-corpus E1 experiment and E0 comparison are the separate M5.2 target gate described in [e1-experiment.md](e1-experiment.md).

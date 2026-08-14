@@ -22,6 +22,12 @@ from junctionlens.model.e0_training import (
     select_e0_checkpoint,
 )
 from junctionlens.model.e1_profile import load_e1_profile
+from junctionlens.model.e1_study import E1StudyError, finalize_e1_study
+from junctionlens.model.e1_training import (
+    E1TrainingError,
+    run_e1_training,
+    select_e1_checkpoint,
+)
 from junctionlens.model.export import ModelExportError, export_model
 from junctionlens.model.overfit import MicroOverfitError, run_micro_overfit
 from junctionlens.model.parity import ParityError, run_parity
@@ -211,6 +217,159 @@ def verify_topology_command(
         base = load_e0_profile(base_profile_path)
         result = run_topology_diagnostic(base, load_e1_profile(profile_path, base), output)
     except (TopologyDiagnosticError, OSError, RuntimeError, ValueError) as error:
+        _fail(error)
+        return
+    _print(result)
+
+
+@model_app.command("train-e1")
+def train_e1_command(
+    dataset_root: Annotated[
+        Path,
+        typer.Option("--dataset-root", exists=True, file_okay=False, resolve_path=True),
+    ],
+    split_manifest: Annotated[
+        Path,
+        typer.Option("--split-manifest", exists=True, dir_okay=False, resolve_path=True),
+    ],
+    topology_diagnostic: Annotated[
+        Path,
+        typer.Option("--topology-diagnostic", exists=True, dir_okay=False, resolve_path=True),
+    ],
+    output_root: Annotated[
+        Path,
+        typer.Option("--output-root", file_okay=False, resolve_path=True),
+    ],
+    base_profile_path: Annotated[
+        Path,
+        typer.Option("--base-profile", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/model/e0-independent-v1.yaml"),
+    profile_path: Annotated[
+        Path,
+        typer.Option("--profile", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/model/e1-joint-v1.yaml"),
+    adapter_config: Annotated[
+        Path,
+        typer.Option("--adapter-config", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.adapter.yaml"),
+    split_policy: Annotated[
+        Path,
+        typer.Option("--split-policy", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.split-v1.yaml"),
+    device: Annotated[str | None, typer.Option("--device")] = None,
+    resume: Annotated[bool, typer.Option("--resume")] = False,
+) -> None:
+    """Train the sole E1 screening seed after the topology learning gate."""
+    try:
+        project_root = Path.cwd().resolve()
+        registration = load_registration(project_root, "openlane-v2-v2.1", "full")
+        registered_root = Path(str(registration["root"])).resolve(strict=True)
+        if registered_root != dataset_root:
+            raise DatasetRegistrationError(
+                "E1 dataset root differs from the checksum-verified full registration"
+            )
+        base = load_e0_profile(base_profile_path)
+        profile = load_e1_profile(profile_path, base)
+        isolation = load_partition_isolation(
+            split_manifest,
+            split_policy,
+            partition=base.training.training_partition,
+            statistics=True,
+        )
+        result = run_e1_training(
+            base,
+            profile,
+            OpenLaneAdapter(dataset_root, adapter_config),
+            isolation,
+            topology_diagnostic,
+            output_root,
+            project_root=project_root,
+            dataset_registration=registration,
+            device_name=device,
+            resume=resume,
+        )
+    except (
+        DatasetRegistrationError,
+        E0DataError,
+        E1TrainingError,
+        ManifestError,
+        OpenLaneAdapterError,
+        OSError,
+        RuntimeError,
+        ValueError,
+    ) as error:
+        _fail(error)
+        return
+    _print(result)
+
+
+@model_app.command("select-e1")
+def select_e1_command(
+    run_root: Annotated[
+        Path,
+        typer.Option("--run-root", exists=True, file_okay=False, resolve_path=True),
+    ],
+    scores: Annotated[
+        Path,
+        typer.Option("--scores", exists=True, dir_okay=False, resolve_path=True),
+    ],
+    selection_split_manifest_sha256: Annotated[
+        str,
+        typer.Option("--selection-split-manifest-sha256"),
+    ],
+) -> None:
+    """Select an E1 epoch with the frozen topology, official, then NLL ordering."""
+    try:
+        result = select_e1_checkpoint(
+            run_root,
+            scores,
+            expected_selection_split_manifest_sha256=selection_split_manifest_sha256,
+        )
+    except (E0TrainingError, E1TrainingError, OSError, TypeError, ValueError) as error:
+        _fail(error)
+        return
+    _print(result)
+
+
+@model_app.command("finalize-e1-study")
+def finalize_e1_study_command(
+    baseline_run_root: Annotated[
+        Path,
+        typer.Option("--baseline-run-root", exists=True, file_okay=False, resolve_path=True),
+    ],
+    candidate_run_root: Annotated[
+        Path,
+        typer.Option("--candidate-run-root", exists=True, file_okay=False, resolve_path=True),
+    ],
+    evidence: Annotated[
+        Path,
+        typer.Option("--evidence", exists=True, dir_okay=False, resolve_path=True),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", dir_okay=False, resolve_path=True),
+    ],
+    base_profile_path: Annotated[
+        Path,
+        typer.Option("--base-profile", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/model/e0-independent-v1.yaml"),
+    profile_path: Annotated[
+        Path,
+        typer.Option("--profile", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/model/e1-joint-v1.yaml"),
+) -> None:
+    """Freeze the valid E1 study and either promote E1 or retain E0."""
+    try:
+        base = load_e0_profile(base_profile_path)
+        result = finalize_e1_study(
+            base,
+            load_e1_profile(profile_path, base),
+            baseline_run_root,
+            candidate_run_root,
+            evidence,
+            output,
+        )
+    except (E1StudyError, OSError, TypeError, ValueError) as error:
         _fail(error)
         return
     _print(result)

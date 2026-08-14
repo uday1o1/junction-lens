@@ -13,6 +13,7 @@ from junctionlens.data.openlane import OpenLaneAdapter
 from junctionlens.model.e0_data import PartitionIsolation
 from junctionlens.model.e0_losses import E0Matches, MatchIndices, unit_training_weights
 from junctionlens.model.e0_profile import load_e0_profile
+from junctionlens.model.e0_training import build_e0_optimizer
 from junctionlens.model.e1_data import frame_e1_targets, scan_edge_weights
 from junctionlens.model.e1_losses import (
     E1EdgeWeights,
@@ -185,6 +186,20 @@ def test_full_predicted_node_objective_backpropagates_through_shared_queries() -
     assert model.topology.lane_source.weight.grad is not None
 
 
+def test_joint_optimizer_includes_every_topology_parameter_once() -> None:
+    base = load_e0_profile(BASE_PATH)
+    profile = load_e1_profile(E1_PATH, base)
+    model = JointGraphModel(base, profile)
+
+    optimizer = build_e0_optimizer(model, base)
+    parameter_ids = [
+        id(parameter) for group in optimizer.param_groups for parameter in group["params"]
+    ]
+
+    assert len(parameter_ids) == len(set(parameter_ids)) == len(list(model.parameters()))
+    assert id(model.topology.lane_source.weight) in parameter_ids
+
+
 def test_training_only_edge_weight_scan_uses_canonical_counts(
     openlane_root: Path,
 ) -> None:
@@ -237,6 +252,8 @@ def test_oracle_and_predicted_node_learning_gates_pass() -> None:
     result = run_topology_diagnostic(base, profile)
 
     assert result["state"] == "ACCEPTED"
+    assert result["base_profile_sha256"] == base.canonical_sha256()
+    assert result["e1_profile_sha256"] == profile.canonical_sha256()
     modes = {item["mode"]: item for item in result["results"]}
     assert modes["oracle-nodes"]["lane_successor_f1"] == 1.0
     assert modes["oracle-nodes"]["control_lane_f1"] == 1.0

@@ -36,6 +36,7 @@ from junctionlens.model.e0_losses import (
 )
 from junctionlens.model.e0_profile import E0Profile
 from junctionlens.model.reference import ReferenceNodeModel, e0_outputs_by_name
+from junctionlens.model.selection import apply_frozen_early_stopping, score_order
 from junctionlens.registry.store import canonical_json_bytes
 
 
@@ -632,20 +633,18 @@ def select_e0_checkpoint(
     epochs = [item.epoch for item in scores]
     if len(epochs) != len(set(epochs)):
         raise E0TrainingError("E0 selection scores repeat an epoch")
-    selected = min(
+    eligible, early_stopping = apply_frozen_early_stopping(
         scores,
-        key=lambda item: (
-            -item.lane_control_topology,
-            -item.official_composite,
-            item.negative_log_likelihood,
-            item.epoch,
-        ),
+        minimum_epoch=20,
+        patience=8,
     )
+    selected = min(eligible, key=score_order)
     checkpoint = run_root / "checkpoints" / f"epoch-{selected.epoch:02d}.pt"
     receipt = {
         "schema_version": "junctionlens.e0-selection-receipt.v1",
         "state": "SELECTED_ON_MODEL_SELECTION",
         "selection_rule": "lane-control-topology-desc,official-composite-desc,nll-asc,epoch-asc",
+        "early_stopping": asdict(early_stopping),
         "selection_split_manifest_sha256": expected_selection_split_manifest_sha256,
         "selected": asdict(selected),
         "checkpoint_sha256": _hash_file(checkpoint),

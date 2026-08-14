@@ -254,6 +254,8 @@ def run_topology_diagnostic(
     report: dict[str, object] = {
         "schema_version": "junctionlens.e1-topology-diagnostic.v1",
         "experiment_id": profile.experiment_id,
+        "base_profile_sha256": base.canonical_sha256(),
+        "e1_profile_sha256": profile.canonical_sha256(),
         "seed": profile.diagnostics.seed,
         "results": [asdict(item) for item in results],
         "state": "ACCEPTED",
