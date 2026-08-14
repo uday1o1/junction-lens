@@ -2,9 +2,8 @@
 
 JunctionLens is a local-first research and model-development product for control-aware road-scene graphs.
 It is under active implementation according to the acceptance gates in `BUILD_PLAN.md`.
-
-The first verified workflow is established in Milestone 0.
-Measured model, runtime, and release claims will be added only after their named evidence gates pass.
+The unrestricted CPU product path is implemented through deterministic synthetic evidence.
+Licensed-data, trained-model, accelerated-runtime, and final-release claims remain blocked until their named gates pass.
 
 JunctionLens is not a vehicle controller, a safety case, or a certification product.
 
@@ -17,6 +16,21 @@ JunctionLens is not a vehicle controller, a safety case, or a certification prod
 
 The command uses repository-locked CPU toolchains and dependencies.
 `junctionlens doctor --json` reports absent dataset, GPU, CUDA, and TensorRT capabilities separately instead of assuming they exist.
+
+## Unrestricted demonstration
+
+```sh
+./tools/jl demo-synthetic
+./tools/jl inspect-demo --artifact-root artifacts/demo
+uv run --locked junctionlens serve --artifact-root artifacts/demo --open-browser
+```
+
+The demo compares 200 real procedural segments and 600 eligible lane-to-control edges.
+It keeps baseline and candidate node detections identical while rotating only the candidate control associations.
+The graph cells reject that candidate for the intended regression reason, and the independent fault lab detects `swap-control-edges` while its nearby clean control passes.
+
+On a CPU-only machine, the overall release status truthfully remains `BLOCKED_INFRASTRUCTURE` because accelerated runtime evidence is absent.
+See [Unrestricted synthetic demonstration](docs/synthetic-demo.md) for the generated evidence, report, viewer, and clean-checkout workflow.
 
 ## Dataset and official metrics
 

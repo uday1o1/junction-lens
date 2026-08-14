@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build:web": "vite build web",
-    "format:check": "prettier --check package.json pnpm-workspace.yaml eslint.config.mjs web",
+    "format:check": "prettier --check package.json pnpm-workspace.yaml eslint.config.mjs web scripts/qualification/inspect_demo.mjs",
     "lint:web": "eslint web/src web/tests web/e2e web/*.ts",
     "lock:check": "pnpm install --frozen-lockfile --ignore-scripts",
     "test:contract": "vitest run web/tests/contract-ids.test.ts",

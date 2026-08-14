@@ -11,6 +11,7 @@ import typer
 from junctionlens.cli.comparison import compare_command
 from junctionlens.cli.contract import contract_app
 from junctionlens.cli.data import data_app
+from junctionlens.cli.demo import demo_synthetic_command
 from junctionlens.cli.fault import fault_command
 from junctionlens.cli.gate import gate_app
 from junctionlens.cli.model import export_command, model_app, train_e0_command
@@ -40,6 +41,7 @@ app.add_typer(model_app, name="model")
 app.add_typer(registry_app, name="registry")
 app.add_typer(synthetic_app, name="synthetic")
 app.command("compare")(compare_command)
+app.command("demo-synthetic")(demo_synthetic_command)
 app.command("fault")(fault_command)
 app.command("infer")(infer_command)
 app.command("train")(train_e0_command)

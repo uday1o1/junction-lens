@@ -34,7 +34,11 @@ Repository commands:
   generate-bindings
   generate-synthetic [--output DIR]
   verify-synthetic [--root DIR]
+  demo-synthetic [--output DIR]
+  inspect-demo --artifact-root DIR
+  install-browser
   test-integration-synthetic
+  test-integration-demo
   test-integration-data
   test-integration-splits
   test-integration-audit
@@ -92,6 +96,8 @@ Repository commands:
   verify-m9-2
   verify-m9-3
   verify-m10-1
+  verify-m10-2
+  verify-local
 EOF
 }
 
@@ -199,11 +205,27 @@ case "$JL_COMMAND" in
       uv run --locked junctionlens synthetic verify "$@"
     fi
     ;;
+  demo-synthetic)
+    if [ "$#" -eq 0 ]; then
+      uv run --locked junctionlens demo-synthetic --output "$JL_ROOT/artifacts/demo"
+    else
+      uv run --locked junctionlens demo-synthetic "$@"
+    fi
+    ;;
+  inspect-demo)
+    uv run --locked python "$JL_ROOT/scripts/qualification/inspect_demo.py" "$@"
+    ;;
+  install-browser)
+    pnpm exec playwright install chromium
+    ;;
   test-integration-synthetic)
     uv run --locked pytest \
       "$JL_ROOT/tests/unit/test_synthetic_generator.py" \
       "$JL_ROOT/tests/integration/test_synthetic_cli.py" \
       "$@"
+    ;;
+  test-integration-demo)
+    uv run --locked pytest "$JL_ROOT/tests/integration/test_demo_cli.py" "$@"
     ;;
   test-integration-data)
     uv run --locked pytest \
@@ -531,6 +553,12 @@ case "$JL_COMMAND" in
     "$0" verify-m9-3
     "$0" test-security
     "$0" test-reproducibility
+    ;;
+  verify-m10-2)
+    python3 "$JL_ROOT/scripts/qualification/verify_clean_checkout.py"
+    ;;
+  verify-local)
+    "$0" verify-m10-1
     ;;
   -h|--help|help)
     usage

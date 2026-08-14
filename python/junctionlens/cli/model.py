@@ -8,35 +8,6 @@ from typing import Annotated
 import typer
 
 from junctionlens.cli.output import emit
-from junctionlens.data.license import DatasetRegistrationError, load_registration
-from junctionlens.data.manifests import ManifestError
-from junctionlens.data.openlane import OpenLaneAdapter, OpenLaneAdapterError
-from junctionlens.model.benchmark import BenchmarkError, run_m0_benchmark
-from junctionlens.model.budget import BudgetError, load_budget_plan
-from junctionlens.model.e0_artifacts import E0ArtifactError, finalize_e0_artifacts
-from junctionlens.model.e0_data import E0DataError, load_partition_isolation
-from junctionlens.model.e0_profile import load_e0_profile
-from junctionlens.model.e0_training import (
-    E0TrainingError,
-    run_e0_training,
-    select_e0_checkpoint,
-)
-from junctionlens.model.e1_profile import load_e1_profile
-from junctionlens.model.e1_study import E1StudyError, finalize_e1_study
-from junctionlens.model.e1_training import (
-    E1TrainingError,
-    run_e1_training,
-    select_e1_checkpoint,
-)
-from junctionlens.model.export import ModelExportError, export_model
-from junctionlens.model.overfit import MicroOverfitError, run_micro_overfit
-from junctionlens.model.parity import ParityError, run_parity
-from junctionlens.model.profile import load_m0_profile
-from junctionlens.model.providers import ProviderProbeError, run_provider_probe
-from junctionlens.model.topology_diagnostic import (
-    TopologyDiagnosticError,
-    run_topology_diagnostic,
-)
 
 model_app = typer.Typer(help="Prove model training and deployment contracts.", no_args_is_help=True)
 
@@ -92,6 +63,13 @@ def train_e0_command(
     resume: Annotated[bool, typer.Option("--resume")] = False,
 ) -> None:
     """Train one predeclared E0 seed from the registered model-training partition."""
+    from junctionlens.data.license import DatasetRegistrationError, load_registration
+    from junctionlens.data.manifests import ManifestError
+    from junctionlens.data.openlane import OpenLaneAdapter, OpenLaneAdapterError
+    from junctionlens.model.e0_data import E0DataError, load_partition_isolation
+    from junctionlens.model.e0_profile import load_e0_profile
+    from junctionlens.model.e0_training import E0TrainingError, run_e0_training
+
     try:
         project_root = Path.cwd().resolve()
         registration = load_registration(project_root, "openlane-v2-v2.1", "full")
@@ -149,6 +127,8 @@ def select_e0_command(
     ],
 ) -> None:
     """Select an E0 epoch with the frozen topology, official, then NLL ordering."""
+    from junctionlens.model.e0_training import E0TrainingError, select_e0_checkpoint
+
     try:
         result = select_e0_checkpoint(
             run_root,
@@ -187,6 +167,9 @@ def finalize_e0_command(
     ] = Path("configs/model/e0-independent-v1.yaml"),
 ) -> None:
     """Finalize the three-seed E0 manifest and measured model card."""
+    from junctionlens.model.e0_artifacts import E0ArtifactError, finalize_e0_artifacts
+    from junctionlens.model.e0_profile import load_e0_profile
+
     try:
         result = finalize_e0_artifacts(
             load_e0_profile(profile_path), run_roots, measured_evidence, output_root
@@ -213,6 +196,13 @@ def verify_topology_command(
     ] = Path("configs/model/e1-joint-v1.yaml"),
 ) -> None:
     """Train and verify the frozen oracle-node and predicted-node topology modes."""
+    from junctionlens.model.e0_profile import load_e0_profile
+    from junctionlens.model.e1_profile import load_e1_profile
+    from junctionlens.model.topology_diagnostic import (
+        TopologyDiagnosticError,
+        run_topology_diagnostic,
+    )
+
     try:
         base = load_e0_profile(base_profile_path)
         result = run_topology_diagnostic(base, load_e1_profile(profile_path, base), output)
@@ -260,6 +250,14 @@ def train_e1_command(
     resume: Annotated[bool, typer.Option("--resume")] = False,
 ) -> None:
     """Train the sole E1 screening seed after the topology learning gate."""
+    from junctionlens.data.license import DatasetRegistrationError, load_registration
+    from junctionlens.data.manifests import ManifestError
+    from junctionlens.data.openlane import OpenLaneAdapter, OpenLaneAdapterError
+    from junctionlens.model.e0_data import E0DataError, load_partition_isolation
+    from junctionlens.model.e0_profile import load_e0_profile
+    from junctionlens.model.e1_profile import load_e1_profile
+    from junctionlens.model.e1_training import E1TrainingError, run_e1_training
+
     try:
         project_root = Path.cwd().resolve()
         registration = load_registration(project_root, "openlane-v2-v2.1", "full")
@@ -319,6 +317,9 @@ def select_e1_command(
     ],
 ) -> None:
     """Select an E1 epoch with the frozen topology, official, then NLL ordering."""
+    from junctionlens.model.e0_training import E0TrainingError
+    from junctionlens.model.e1_training import E1TrainingError, select_e1_checkpoint
+
     try:
         result = select_e1_checkpoint(
             run_root,
@@ -359,6 +360,10 @@ def finalize_e1_study_command(
     ] = Path("configs/model/e1-joint-v1.yaml"),
 ) -> None:
     """Freeze the valid E1 study and either promote E1 or retain E0."""
+    from junctionlens.model.e0_profile import load_e0_profile
+    from junctionlens.model.e1_profile import load_e1_profile
+    from junctionlens.model.e1_study import E1StudyError, finalize_e1_study
+
     try:
         base = load_e0_profile(base_profile_path)
         result = finalize_e1_study(
@@ -385,6 +390,9 @@ def micro_overfit_command(
     steps: Annotated[int | None, typer.Option("--steps", min=100, max=5000)] = None,
 ) -> None:
     """Overfit the fixed 32-frame set and enforce every M0-owned threshold."""
+    from junctionlens.model.overfit import MicroOverfitError, run_micro_overfit
+    from junctionlens.model.profile import load_m0_profile
+
     try:
         report = run_micro_overfit(load_m0_profile(profile_path), output_dir, steps=steps)
     except (MicroOverfitError, OSError, ValueError) as error:
@@ -405,6 +413,9 @@ def export_command(
     profile_path: ProfileOption = Path("configs/model/m0-spike.yaml"),
 ) -> None:
     """Export and structurally validate the frozen opset-18 graph."""
+    from junctionlens.model.export import ModelExportError, export_model
+    from junctionlens.model.profile import load_m0_profile
+
     try:
         report = export_model(load_m0_profile(profile_path), checkpoint, output)
     except (ModelExportError, OSError, RuntimeError, ValueError) as error:
@@ -433,6 +444,9 @@ def parity_command(
     profile_path: ProfileOption = Path("configs/model/m0-spike.yaml"),
 ) -> None:
     """Compare all raw outputs from PyTorch, Python ORT, and native C++ ORT."""
+    from junctionlens.model.parity import ParityError, run_parity
+    from junctionlens.model.profile import load_m0_profile
+
     try:
         report = run_parity(load_m0_profile(profile_path), checkpoint, model, native_runner, output)
     except (ParityError, OSError, RuntimeError, ValueError) as error:
@@ -453,6 +467,9 @@ def providers_command(
     profile_path: ProfileOption = Path("configs/model/m0-spike.yaml"),
 ) -> None:
     """Trace CPU and every locally available accelerated execution provider."""
+    from junctionlens.model.profile import load_m0_profile
+    from junctionlens.model.providers import ProviderProbeError, run_provider_probe
+
     try:
         report = run_provider_probe(model, load_m0_profile(profile_path), output)
     except (ProviderProbeError, OSError, RuntimeError, ValueError) as error:
@@ -489,6 +506,10 @@ def benchmark_command(
     profile_path: ProfileOption = Path("configs/model/m0-spike.yaml"),
 ) -> None:
     """Record local portability numbers and freeze target acceptance margins."""
+    from junctionlens.model.benchmark import BenchmarkError, run_m0_benchmark
+    from junctionlens.model.budget import BudgetError, load_budget_plan
+    from junctionlens.model.profile import load_m0_profile
+
     try:
         report = run_m0_benchmark(
             load_m0_profile(profile_path),
