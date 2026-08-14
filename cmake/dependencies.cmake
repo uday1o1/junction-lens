@@ -72,6 +72,33 @@ FetchContent_Declare(
   URL_HASH SHA256=9a7c11f924eff5f8d8070e297b322ee68b9227e003fd600d4b8122198091665f
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
+
+# The native inference runtime needs deterministic CPU image decode and bilinear
+# preprocessing only.  Keep the locked OpenCV source build intentionally small
+# and free of GUI, video, language-binding, and optional system integrations.
+set(BUILD_LIST "core,imgproc,imgcodecs" CACHE STRING "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_opencv_apps OFF CACHE BOOL "" FORCE)
+set(BUILD_opencv_java_bindings_generator OFF CACHE BOOL "" FORCE)
+set(BUILD_opencv_js OFF CACHE BOOL "" FORCE)
+set(BUILD_opencv_python_bindings_generator OFF CACHE BOOL "" FORCE)
+set(BUILD_opencv_python_tests OFF CACHE BOOL "" FORCE)
+set(BUILD_PERF_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(WITH_1394 OFF CACHE BOOL "" FORCE)
+set(WITH_FFMPEG OFF CACHE BOOL "" FORCE)
+set(WITH_GSTREAMER OFF CACHE BOOL "" FORCE)
+set(WITH_GTK OFF CACHE BOOL "" FORCE)
+set(WITH_OPENCL OFF CACHE BOOL "" FORCE)
+set(WITH_OPENEXR OFF CACHE BOOL "" FORCE)
+set(WITH_PROTOBUF OFF CACHE BOOL "" FORCE)
+set(BUILD_PROTOBUF OFF CACHE BOOL "" FORCE)
+set(WITH_QT OFF CACHE BOOL "" FORCE)
+set(WITH_TIFF OFF CACHE BOOL "" FORCE)
+set(WITH_V4L OFF CACHE BOOL "" FORCE)
+set(WITH_WEBP OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
   junctionlens_pybind11
   URL https://github.com/pybind/pybind11/archive/refs/tags/v3.0.1.tar.gz
@@ -106,6 +133,7 @@ set_property(
   PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_junctionlens_eigen_includes}"
 )
 unset(_junctionlens_eigen_includes)
+FetchContent_MakeAvailable(junctionlens_opencv)
 set(BUILD_TESTING "${_junctionlens_build_testing}" CACHE BOOL "" FORCE)
 unset(_junctionlens_build_testing)
 

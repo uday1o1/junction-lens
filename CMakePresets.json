@@ -36,7 +36,11 @@
     {
       "name": "sanitizers",
       "configurePreset": "sanitizers",
-      "targets": ["junctionlens-geometry-tests", "junctionlens-eval-tests"]
+      "targets": [
+        "junctionlens-geometry-tests",
+        "junctionlens-eval-tests",
+        "junctionlens-infer-tests"
+      ]
     }
   ],
   "testPresets": [
@@ -52,7 +56,7 @@
       "configurePreset": "sanitizers",
       "filter": {
         "include": {
-          "name": "^(geometry|eval)\\."
+          "name": "^(geometry|eval|infer)\\."
         }
       },
       "environment": {

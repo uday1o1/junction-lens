@@ -11,6 +11,10 @@ include(cmake/dependencies.cmake)
 include(cmake/sanitizers.cmake)
 
 add_executable(junctionlens-toolchain-probe cpp/tools/toolchain_probe.cpp)
+set_target_properties(
+  junctionlens-toolchain-probe
+  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}"
+)
 
 set(JUNCTIONLENS_PROTO_ROOT "${PROJECT_SOURCE_DIR}/proto")
 set(JUNCTIONLENS_PROTO_FILE "${JUNCTIONLENS_PROTO_ROOT}/junctionlens/v1/scene_control_graph.proto")
@@ -56,6 +60,10 @@ target_link_libraries(junctionlens_contract PUBLIC junctionlens_contract_proto)
 
 add_executable(junctionlens-contract-probe cpp/contract/probe.cpp)
 target_link_libraries(junctionlens-contract-probe PRIVATE junctionlens::contract)
+set_target_properties(
+  junctionlens-contract-probe
+  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}"
+)
 
 add_library(junctionlens_geometry STATIC cpp/src/geometry/geometry.cpp)
 add_library(junctionlens::geometry ALIAS junctionlens_geometry)
@@ -80,13 +88,67 @@ target_link_libraries(junctionlens-onnx-probe PRIVATE onnxruntime::onnxruntime)
 set_target_properties(
   junctionlens-onnx-probe
   PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}"
     BUILD_RPATH "${JUNCTIONLENS_ONNXRUNTIME_ROOT}/lib"
     INSTALL_RPATH "$ORIGIN/../lib"
 )
 
+add_library(
+  junctionlens_infer
+  STATIC
+    cpp/src/infer/buffer_pool.cpp
+    cpp/src/infer/preprocess.cpp
+    cpp/src/infer/runtime.cpp
+    cpp/src/infer/sha256.cpp
+)
+add_library(junctionlens::infer ALIAS junctionlens_infer)
+target_include_directories(
+  junctionlens_infer
+  PUBLIC
+    "${PROJECT_SOURCE_DIR}/cpp/include"
+    "${PROJECT_SOURCE_DIR}/cpp"
+)
+target_include_directories(
+  junctionlens_infer
+  SYSTEM PRIVATE
+    "${PROJECT_BINARY_DIR}"
+    "${junctionlens_opencv_SOURCE_DIR}/modules/core/include"
+    "${junctionlens_opencv_SOURCE_DIR}/modules/imgcodecs/include"
+    "${junctionlens_opencv_SOURCE_DIR}/modules/imgproc/include"
+)
+target_link_libraries(
+  junctionlens_infer
+  PUBLIC
+    junctionlens::contract
+  PRIVATE
+    Eigen3::Eigen
+    onnxruntime::onnxruntime
+    opencv_core
+    opencv_imgcodecs
+    opencv_imgproc
+)
+junctionlens_enable_sanitizers(junctionlens_infer)
+set_target_properties(
+  junctionlens_infer
+  PROPERTIES
+    BUILD_RPATH "${JUNCTIONLENS_ONNXRUNTIME_ROOT}/lib"
+)
+
+add_executable(junctionlens-runtime cpp/runtime/main.cpp)
+target_link_libraries(junctionlens-runtime PRIVATE junctionlens::infer onnxruntime::onnxruntime)
+set_target_properties(
+  junctionlens-runtime
+  PROPERTIES
+    BUILD_RPATH "${JUNCTIONLENS_ONNXRUNTIME_ROOT}/lib"
+    INSTALL_RPATH "$ORIGIN/../lib"
+)
+junctionlens_enable_sanitizers(junctionlens-runtime)
+
 if(MSVC)
   target_compile_options(junctionlens-toolchain-probe PRIVATE /W4 /WX)
   target_compile_options(junctionlens-onnx-probe PRIVATE /W4 /WX)
+  target_compile_options(junctionlens_infer PRIVATE /W4 /WX)
+  target_compile_options(junctionlens-runtime PRIVATE /W4 /WX)
   target_compile_options(junctionlens_contract PRIVATE /W4 /WX)
   target_compile_options(junctionlens-contract-probe PRIVATE /W4 /WX)
   target_compile_options(junctionlens_geometry PRIVATE /W4 /WX)
@@ -103,6 +165,8 @@ else()
   )
   target_compile_options(junctionlens-toolchain-probe PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   target_compile_options(junctionlens-onnx-probe PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
+  target_compile_options(junctionlens_infer PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
+  target_compile_options(junctionlens-runtime PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   target_compile_options(junctionlens_contract PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   target_compile_options(junctionlens-contract-probe PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   target_compile_options(junctionlens_geometry PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
@@ -111,12 +175,15 @@ else()
     set(JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS -Wno-gcc-compat -Wno-nullability-extension)
     target_compile_options(junctionlens_contract PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS})
     target_compile_options(junctionlens-contract-probe PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS})
+    target_compile_options(junctionlens_infer PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS})
+    target_compile_options(junctionlens-runtime PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS})
   endif()
 endif()
 
 if(BUILD_TESTING)
   add_test(NAME toolchain-probe-json COMMAND junctionlens-toolchain-probe)
   add_test(NAME onnx-probe-help COMMAND junctionlens-onnx-probe --help)
+  add_test(NAME runtime-help COMMAND junctionlens-runtime --help)
   add_test(NAME contract-probe-help COMMAND junctionlens-contract-probe --help)
   add_test(
     NAME contract-golden-cpp
@@ -147,6 +214,21 @@ if(BUILD_TESTING)
     target_compile_options(junctionlens-eval-tests PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   endif()
   gtest_discover_tests(junctionlens-eval-tests TEST_PREFIX eval.)
+  add_executable(junctionlens-infer-tests cpp/tests/infer/runtime_test.cpp)
+  target_link_libraries(junctionlens-infer-tests PRIVATE junctionlens::infer GTest::gtest_main)
+  junctionlens_enable_sanitizers(junctionlens-infer-tests)
+  if(MSVC)
+    target_compile_options(junctionlens-infer-tests PRIVATE /W4 /WX)
+  else()
+    target_compile_options(junctionlens-infer-tests PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
+    if(APPLE)
+      target_compile_options(
+        junctionlens-infer-tests
+        PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS}
+      )
+    endif()
+  endif()
+  gtest_discover_tests(junctionlens-infer-tests TEST_PREFIX infer.)
   set_tests_properties(
     toolchain-probe-json
     PROPERTIES

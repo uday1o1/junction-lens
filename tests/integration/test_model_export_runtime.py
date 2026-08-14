@@ -6,34 +6,17 @@ from pathlib import Path
 
 import onnx
 import pytest
-import torch
 
 from junctionlens.model.export import ModelExportError, export_model, validate_exported_model
 from junctionlens.model.parity import run_parity
 from junctionlens.model.profile import load_m0_profile
-from junctionlens.model.spike import M0GraphModel
 
 
 @pytest.fixture(scope="module")
-def exported_model(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
-    root = tmp_path_factory.mktemp("model-export")
-    profile = load_m0_profile(Path("configs/model/m0-spike.yaml"))
-    torch.manual_seed(profile.seed)
-    checkpoint = root / "checkpoint.pt"
-    torch.save(
-        {
-            "model_state_dict": M0GraphModel(profile).state_dict(),
-            "profile_sha256": profile.canonical_sha256(),
-            "profile": profile.model_dump(mode="json"),
-            "seed": profile.seed,
-        },
-        checkpoint,
-    )
-    model_path = root / "model.onnx"
-    report = export_model(profile, checkpoint, model_path)
-    assert report["status"] == "PASSED"
+def exported_model(exported_m0_model: tuple[Path, Path]) -> tuple[Path, Path]:
+    _, model_path = exported_m0_model
     assert str(Path.cwd()).encode() not in model_path.read_bytes()
-    return checkpoint, model_path
+    return exported_m0_model
 
 
 def test_export_runs_python_and_native_raw_output_parity(

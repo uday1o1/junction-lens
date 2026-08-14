@@ -43,6 +43,7 @@ Repository commands:
   test-integration-registry
   test-integration-comparison
   test-integration-faults
+  test-integration-runtime
   test-web
   build-evaluator [--check-lock]
   test-evaluator
@@ -72,6 +73,7 @@ Repository commands:
   verify-m7-1-local
   verify-m7-2-local
   verify-m7-3-local
+  verify-m8-1-local
 EOF
 }
 
@@ -251,6 +253,12 @@ case "$JL_COMMAND" in
       "$JL_ROOT/tests/integration/test_fault_cli.py" \
       "$@"
     ;;
+  test-integration-runtime)
+    uv run --locked pytest \
+      "$JL_ROOT/tests/integration/test_model_export_runtime.py" \
+      "$JL_ROOT/tests/integration/test_runtime_cli.py" \
+      "$@"
+    ;;
   test-web)
     pnpm run typecheck:web
     pnpm run test:contract
@@ -390,6 +398,10 @@ case "$JL_COMMAND" in
   verify-m7-3-local)
     "$0" verify-m7-2-local
     "$0" test-integration-faults
+    ;;
+  verify-m8-1-local)
+    "$0" verify-m7-3-local
+    "$0" test-integration-runtime
     ;;
   -h|--help|help)
     usage

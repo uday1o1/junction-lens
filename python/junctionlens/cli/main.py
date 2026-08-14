@@ -15,6 +15,7 @@ from junctionlens.cli.fault import fault_command
 from junctionlens.cli.gate import gate_app
 from junctionlens.cli.model import model_app
 from junctionlens.cli.registry import registry_app
+from junctionlens.cli.runtime import infer_command
 from junctionlens.cli.synthetic import synthetic_app
 from junctionlens.doctor.service import run_doctor
 from junctionlens.evaluator import EvaluationError, evaluate_custom, evaluate_official
@@ -37,6 +38,7 @@ app.add_typer(registry_app, name="registry")
 app.add_typer(synthetic_app, name="synthetic")
 app.command("compare")(compare_command)
 app.command("fault")(fault_command)
+app.command("infer")(infer_command)
 
 
 @app.callback()

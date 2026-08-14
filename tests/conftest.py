@@ -9,6 +9,34 @@ import pytest
 from PIL import Image
 
 
+@pytest.fixture(scope="session")
+def exported_m0_model(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """Export one deterministic M0 model for every native runtime integration module."""
+    import torch
+
+    from junctionlens.model.export import export_model
+    from junctionlens.model.profile import load_m0_profile
+    from junctionlens.model.spike import M0GraphModel
+
+    root = tmp_path_factory.mktemp("shared-model-export")
+    profile = load_m0_profile(Path("configs/model/m0-spike.yaml"))
+    torch.manual_seed(profile.seed)
+    checkpoint = root / "checkpoint.pt"
+    torch.save(
+        {
+            "model_state_dict": M0GraphModel(profile).state_dict(),
+            "profile_sha256": profile.canonical_sha256(),
+            "profile": profile.model_dump(mode="json"),
+            "seed": profile.seed,
+        },
+        checkpoint,
+    )
+    model_path = root / "model.onnx"
+    report = export_model(profile, checkpoint, model_path)
+    assert report["status"] == "PASSED"
+    return checkpoint, model_path
+
+
 def _metadata(root: Path, timestamp: int, pose_forward: float) -> None:
     image_relative = Path("train/segment-1/image/ring_front_center/frame.jpg")
     annotation = {
