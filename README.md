@@ -31,6 +31,9 @@ See [Paired comparison and release decisions](docs/paired-comparison.md) for exa
 See [Structural fault lab](docs/fault-lab.md) for the mandatory graph, geometry, calibration, temporal, and runtime corruption matrix.
 See [Native inference runtime](docs/runtime.md) for the bounded C++ batch path, accelerated-provider design, preprocessing contract, output provenance, and parity evidence.
 See [Remote GPU qualification](docs/gpu-qualification.md) for secure source synchronization, target preflight, resumable phases, and the consolidated hardware handoff.
+See [Local evidence service](docs/local-evidence-service.md) for the loopback-only read API and production browser workflow.
+See [Scene viewer](docs/scene-viewer.md) for synchronized camera and graph regression inspection.
+See [Reproducible evidence reports](docs/evidence-reports.md) for deterministic public and acknowledged private offline bundles.
 
 See [E1 learned topology](docs/e1-learned-topology.md) for the directed edge heads, canonical matrix ordering, topology objective, and oracle-node versus predicted-node diagnostics.
 

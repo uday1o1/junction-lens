@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://junctionlens.local/schemas/report-v1.schema.json",
+  "title": "JunctionLens evidence report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authoritative_decision_persisted",
+    "cells",
+    "counterexamples",
+    "decision_recalculated",
+    "export_mode",
+    "identities",
+    "primary_hypotheses",
+    "privacy",
+    "private_images",
+    "reason_codes",
+    "schema_version",
+    "status",
+    "title"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "junctionlens.evidence-report.v1"
+    },
+    "export_mode": {
+      "enum": ["public", "private"]
+    },
+    "title": {
+      "const": "JunctionLens Evidence Report"
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "reason_codes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "identities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_manifest_sha256",
+        "candidate_manifest_sha256",
+        "charter_sha256",
+        "decision_manifest_sha256",
+        "metrics_table_manifest_sha256",
+        "slice_table_manifest_sha256"
+      ],
+      "properties": {
+        "baseline_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "candidate_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "charter_sha256": { "$ref": "#/$defs/sha256" },
+        "decision_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "metrics_table_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "slice_table_manifest_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "cells": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/cell"
+      }
+    },
+    "primary_hypotheses": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "counterexamples": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image_count", "included", "scene_manifest_sha256"],
+      "properties": {
+        "included": { "type": "boolean" },
+        "scene_manifest_sha256": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "image_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_frames_included",
+        "licensed_thumbnails_opt_in",
+        "private_paths_included"
+      ],
+      "properties": {
+        "dataset_frames_included": { "type": "boolean" },
+        "licensed_thumbnails_opt_in": { "type": "boolean" },
+        "private_paths_included": { "const": false }
+      }
+    },
+    "private_images": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/privateImage"
+      }
+    },
+    "authoritative_decision_persisted": { "const": true },
+    "decision_recalculated": { "const": false }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cell_id",
+        "counterexample_query",
+        "finite_replicates",
+        "interval",
+        "invalid_replicates",
+        "margin",
+        "metric",
+        "point_estimate",
+        "reason_code",
+        "slice",
+        "status",
+        "support"
+      ],
+      "properties": {
+        "cell_id": { "type": "string" },
+        "metric": { "type": "string" },
+        "slice": { "type": "string" },
+        "status": { "type": "string" },
+        "reason_code": { "type": "string" },
+        "support": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "point_estimate": { "$ref": "#/$defs/nullableNumber" },
+        "interval": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/nullableNumber" }
+        },
+        "margin": { "type": "number" },
+        "finite_replicates": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        },
+        "invalid_replicates": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        },
+        "counterexample_query": { "type": "string" }
+      }
+    },
+    "nullableNumber": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "null" }
+      ]
+    },
+    "privateImage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "camera_slot",
+        "frame_id",
+        "label",
+        "license_id",
+        "relative_path",
+        "source_label",
+        "source_manifest_sha256"
+      ],
+      "properties": {
+        "camera_slot": { "type": "string" },
+        "frame_id": { "type": "string" },
+        "label": { "type": "string" },
+        "license_id": { "type": "string" },
+        "relative_path": {
+          "type": "string",
+          "pattern": "^private-thumbnails/[0-9a-f]{64}\\.(jpg|png|webp)$"
+        },
+        "source_label": { "type": "string" },
+        "source_manifest_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

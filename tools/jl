@@ -48,6 +48,7 @@ Repository commands:
   test-integration-runtime
   test-integration-performance
   test-integration-app
+  test-integration-report
   test-web
   build-evaluator [--check-lock]
   test-evaluator
@@ -82,6 +83,7 @@ Repository commands:
   verify-m8-3-local
   verify-m9-1
   verify-m9-2
+  verify-m9-3
 EOF
 }
 
@@ -285,6 +287,11 @@ case "$JL_COMMAND" in
       "$JL_ROOT/tests/integration/test_app_cli_api.py" \
       "$@"
     ;;
+  test-integration-report)
+    uv run --locked pytest \
+      "$JL_ROOT/tests/integration/test_report_cli.py" \
+      "$@"
+    ;;
   test-web)
     pnpm run lint:web
     pnpm run typecheck:web
@@ -454,6 +461,10 @@ case "$JL_COMMAND" in
   verify-m9-2)
     "$0" verify-m9-1
     "$0" test-web
+    ;;
+  verify-m9-3)
+    "$0" verify-m9-2
+    "$0" test-integration-report
     ;;
   -h|--help|help)
     usage

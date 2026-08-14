@@ -6,35 +6,66 @@ from __future__ import annotations
 import argparse
 import hashlib
 import io
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import uvicorn
 from PIL import Image, ImageDraw
 
 from junctionlens.api import ServiceConfig, create_app
 from junctionlens.registry.service import EvidenceRegistry
 from junctionlens.registry.store import canonical_json_bytes
+from junctionlens.report import export_evidence_bundle
 
 ROOT = Path(__file__).parents[2]
 SCHEMA = ROOT / "schemas/artifact-manifest-v1.schema.json"
 
 
 def _decision() -> dict[str, Any]:
+    cell = {
+        "cell_id": "control-edge-recall/overall",
+        "metric": "control_edge_recall",
+        "slice": "overall",
+        "status": "FAIL_REGRESSION",
+        "reason_code": "GATE_REGRESSION_CI_BELOW_MARGIN",
+        "support": {
+            "paired_segments": 200,
+            "eligible_ground_truth_edges": 600,
+            "adjacent_frame_transitions": 0,
+            "temporal_segments": 0,
+        },
+        "point_estimate": -0.02,
+        "interval": {
+            "lower": -0.03,
+            "upper": -0.01,
+            "adjusted_two_sided_alpha": 0.05,
+        },
+        "margin": 0.005,
+        "finite_replicates": 10000,
+        "invalid_replicates": 0,
+        "counterexample_query": "delta < -0.01 order by severity descending",
+    }
     body: dict[str, Any] = {
         "schema_version": "junctionlens.gate-decision.v1",
         "status": "FAIL_REGRESSION",
-        "cells": [
-            {
-                "cell_id": "control-edge-recall/overall",
-                "status": "FAIL_REGRESSION",
-                "reason_code": "GATE_REGRESSION_CI_BELOW_MARGIN",
-            }
-        ],
+        "charter_sha256": "c" * 64,
+        "evidence_sha256": "e" * 64,
+        "bootstrap": {
+            "algorithm": "paired-segment-cluster-bootstrap-v1",
+            "replicates": 10000,
+            "seed": 20260813,
+            "interval_method": "type7-percentile-bonferroni-two-sided",
+            "gating_cells": 1,
+        },
+        "cells": [cell],
         "integrity_reason_codes": [],
         "infrastructure_reason_codes": [],
         "performance_reason_codes": [],
+        "primary_hypotheses": [],
     }
     body["decision_sha256"] = hashlib.sha256(canonical_json_bytes(body)).hexdigest()
     return body
@@ -149,6 +180,20 @@ def _bundle(
     }
 
 
+def _parquet_bytes(table: pa.Table) -> bytes:
+    output = io.BytesIO()
+    pq.write_table(
+        table,
+        output,
+        compression="zstd",
+        data_page_version="2.0",
+        version="2.6",
+        use_dictionary=False,
+        write_statistics=True,
+    )
+    return output.getvalue()
+
+
 def _populate(root: Path) -> None:
     registry = EvidenceRegistry(root, SCHEMA)
     decision = _decision()
@@ -178,13 +223,82 @@ def _populate(root: Path) -> None:
             image_parents.append(receipt.manifest_sha256)
         images.append((frame_images[0], frame_images[1]))
     bundle = _bundle(decision_receipt.manifest_sha256, images)
-    registry.put_bytes(
+    scene_receipt = registry.put_bytes(
         canonical_json_bytes(bundle) + b"\n",
         kind="counterexample_bundle",
         media_type="application/vnd.junctionlens.scene-bundle+json",
         license_id="CC0-1.0",
         metadata={"frame_count": 2, "source": "repository-owned-synthetic"},
         parents=tuple(sorted([decision_receipt.manifest_sha256, *image_parents])),
+    )
+    metrics_receipt = registry.put_bytes(
+        _parquet_bytes(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "cell_id": decision["cells"][0]["cell_id"],
+                        "point_estimate": -0.02,
+                    }
+                ],
+                schema=pa.schema([("cell_id", pa.string()), ("point_estimate", pa.float64())]),
+            )
+        ),
+        kind="comparison",
+        media_type="application/vnd.apache.parquet",
+        license_id="CC0-1.0",
+        metadata={"row_count": 1},
+        parents=(decision_receipt.manifest_sha256,),
+    )
+    slices_receipt = registry.put_bytes(
+        _parquet_bytes(
+            pa.Table.from_pylist(
+                [{"frame_token": "frame-00", "source_domain": "synthetic"}],
+                schema=pa.schema([("frame_token", pa.string()), ("source_domain", pa.string())]),
+            )
+        ),
+        kind="slice_table",
+        media_type="application/vnd.apache.parquet",
+        license_id="CC0-1.0",
+        metadata={"row_count": 1},
+    )
+    report_data = {
+        "schema_version": "junctionlens.comparison-report-data.v1",
+        "status": decision["status"],
+        "baseline_manifest_sha256": "a" * 64,
+        "candidate_manifest_sha256": "b" * 64,
+        "charter_sha256": decision["charter_sha256"],
+        "decision_manifest_sha256": decision_receipt.manifest_sha256,
+        "metrics_table_manifest_sha256": metrics_receipt.manifest_sha256,
+        "slice_table_manifest_sha256": slices_receipt.manifest_sha256,
+        "reason_codes": ["GATE_REGRESSION_CI_BELOW_MARGIN"],
+        "cells": decision["cells"],
+        "primary_hypotheses": decision["primary_hypotheses"],
+        "filtering_changes_release_status": False,
+    }
+    comparison_receipt = registry.put_bytes(
+        canonical_json_bytes(report_data) + b"\n",
+        kind="comparison",
+        media_type="application/vnd.junctionlens.comparison-report-data+json",
+        license_id="CC0-1.0",
+        metadata={"status": decision["status"]},
+        parents=(
+            decision_receipt.manifest_sha256,
+            metrics_receipt.manifest_sha256,
+            slices_receipt.manifest_sha256,
+        ),
+    )
+    offline_output = ROOT / "web" / "test-results" / "offline-report"
+    if offline_output.exists():
+        shutil.rmtree(offline_output)
+    offline_output.parent.mkdir(parents=True, exist_ok=True)
+    export_evidence_bundle(
+        artifact_root=root,
+        schema_path=SCHEMA,
+        project_root=ROOT,
+        comparison_manifest_sha256=comparison_receipt.manifest_sha256,
+        output_directory=offline_output,
+        mode="public",
+        scene_manifest_sha256=scene_receipt.manifest_sha256,
     )
 
 

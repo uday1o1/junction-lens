@@ -66,12 +66,15 @@ The browser and API consume the registered `release_decision` payload.
 The service verifies the decision's own `decision_sha256` before returning it.
 Changing a client-side filter cannot change the served release status.
 
-Create an immutable JSON report snapshot from a decision with:
+Export a complete deterministic offline bundle from the immutable report-data artifact printed by `junctionlens compare`:
 
 ```bash
 uv run --locked junctionlens report \
-  --decision <decision-manifest-sha256> \
-  --artifact-root artifacts/demo
+  --comparison <comparison-report-data-manifest-sha256> \
+  --artifact-root artifacts/demo \
+  --output-dir artifacts/demo/public-report
 ```
 
-The command prints the report manifest hash, payload hash, and immutable relative path.
+The command prints the registered ZIP manifest hash, payload hash, bundle manifest hash, immutable relative path, and every materialized file hash.
+Open `REPORT.html` directly from the output directory for an offline review that does not require this service.
+See [Reproducible evidence reports](evidence-reports.md) for the public and acknowledged private export contracts.
