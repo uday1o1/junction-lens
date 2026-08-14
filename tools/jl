@@ -41,6 +41,7 @@ Repository commands:
   test-integration-topology
   test-integration-e1-study
   test-integration-registry
+  test-integration-comparison
   test-web
   build-evaluator [--check-lock]
   test-evaluator
@@ -68,6 +69,7 @@ Repository commands:
   verify-m5-1-local
   verify-m5-2-local
   verify-m7-1-local
+  verify-m7-2-local
 EOF
 }
 
@@ -233,6 +235,14 @@ case "$JL_COMMAND" in
       "$JL_ROOT/tests/integration/test_registry_cli.py" \
       "$@"
     ;;
+  test-integration-comparison)
+    uv run --locked pytest \
+      "$JL_ROOT/tests/unit/test_gate_bootstrap.py" \
+      "$JL_ROOT/tests/unit/test_gate_comparison.py" \
+      "$JL_ROOT/tests/unit/test_gate_decision.py" \
+      "$JL_ROOT/tests/integration/test_comparison_cli.py" \
+      "$@"
+    ;;
   test-web)
     pnpm run typecheck:web
     pnpm run test:contract
@@ -364,6 +374,10 @@ case "$JL_COMMAND" in
   verify-m7-1-local)
     "$0" verify-m5-2-local
     "$0" test-integration-registry
+    ;;
+  verify-m7-2-local)
+    "$0" verify-m7-1-local
+    "$0" test-integration-comparison
     ;;
   -h|--help|help)
     usage

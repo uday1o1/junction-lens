@@ -83,6 +83,8 @@ uv run junctionlens gate decide \
 
 The command writes one immutable decision, returns exit code 3 for a valid non-passing decision, and refuses to replace an existing decision.
 
+The complete artifact-backed workflow is documented in [Paired comparison and release decisions](paired-comparison.md).
+
 ## Local package gate
 
 Run the hardware-independent implementation gate with:

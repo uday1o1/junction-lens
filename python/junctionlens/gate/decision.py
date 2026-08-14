@@ -46,6 +46,8 @@ class IntegrityEvidence(_Strict):
     candidate_evaluator_image_digest: str
     baseline_data_manifest_sha256: str
     candidate_data_manifest_sha256: str
+    baseline_split_manifest_sha256: str
+    candidate_split_manifest_sha256: str
     baseline_preprocessing_sha256: str
     candidate_preprocessing_sha256: str
     baseline_postprocessing_sha256: str
@@ -54,6 +56,20 @@ class IntegrityEvidence(_Strict):
     slice_registry_sha256: str
     calibration_ranks_frozen: bool
     candidate_training_holdout_access_count: int = Field(ge=0)
+    frame_sets_match: bool
+    slice_values_match: bool
+    support_values_match: bool
+    schema_major_compatible: bool
+    identifiers_valid: bool
+    coordinate_metadata_valid: bool
+    required_values_finite: bool
+    calibrator_valid: bool
+    evaluator_compatible: bool
+    provenance_complete: bool
+    leakage_free: bool
+    partial_inference_approved: bool
+    provider_fallback_free: bool
+    registry_inputs_match: bool
 
 
 class SupportEvidence(_Strict):
@@ -78,7 +94,9 @@ class CellEvidence(_Strict):
 
 
 class RuntimeEvidence(_Strict):
+    baseline_hardware_manifest_sha256: str
     hardware_baseline_manifest_sha256: str
+    baseline_gpu_provider_active: bool
     gpu_provider_active: bool
     throughput_per_second: float
     p95_latency_ms: float
@@ -91,6 +109,11 @@ class RuntimeEvidence(_Strict):
     measured_frames_per_block: int = Field(ge=0)
     trial_blocks: int = Field(ge=0)
     trial_block_order: tuple[Literal["AB", "BA"], ...]
+    baseline_warmup_frames_per_block: int = Field(ge=0)
+    baseline_measured_frames_per_block: int = Field(ge=0)
+    baseline_trial_block_order: tuple[Literal["AB", "BA"], ...]
+    baseline_environment_valid: bool
+    paired_trial_ids_match: bool
     environment_valid: bool
 
     @model_validator(mode="after")
@@ -228,6 +251,8 @@ def _integrity_failures(evidence: GateEvidence, charter: FrozenCharter) -> list[
         failures.append("GATE_INTEGRITY_EVALUATOR_MISMATCH")
     if integrity.baseline_data_manifest_sha256 != integrity.candidate_data_manifest_sha256:
         failures.append("GATE_INTEGRITY_DATA_MANIFEST_MISMATCH")
+    if integrity.baseline_split_manifest_sha256 != integrity.candidate_split_manifest_sha256:
+        failures.append("GATE_INTEGRITY_SPLIT_MANIFEST_MISMATCH")
     if integrity.baseline_preprocessing_sha256 != integrity.candidate_preprocessing_sha256:
         failures.append("GATE_INTEGRITY_PREPROCESSING_MISMATCH")
     if integrity.baseline_postprocessing_sha256 != integrity.candidate_postprocessing_sha256:
@@ -240,6 +265,24 @@ def _integrity_failures(evidence: GateEvidence, charter: FrozenCharter) -> list[
         failures.append("GATE_INTEGRITY_CALIBRATION_RANK_CHANGED")
     if integrity.candidate_training_holdout_access_count != 0:
         failures.append("GATE_INTEGRITY_HOLDOUT_USED_FOR_TRAINING")
+    for valid, reason in (
+        (integrity.frame_sets_match, "GATE_INTEGRITY_FRAME_SET_MISMATCH"),
+        (integrity.slice_values_match, "GATE_INTEGRITY_SLICE_VALUES_MISMATCH"),
+        (integrity.support_values_match, "GATE_INTEGRITY_SUPPORT_MISMATCH"),
+        (integrity.schema_major_compatible, "GATE_INTEGRITY_SCHEMA_MAJOR_MISMATCH"),
+        (integrity.identifiers_valid, "GATE_INTEGRITY_IDENTIFIERS_INVALID"),
+        (integrity.coordinate_metadata_valid, "GATE_INTEGRITY_COORDINATE_METADATA_INVALID"),
+        (integrity.required_values_finite, "GATE_INTEGRITY_NONFINITE_REQUIRED_VALUE"),
+        (integrity.calibrator_valid, "GATE_INTEGRITY_CALIBRATOR_INVALID"),
+        (integrity.evaluator_compatible, "GATE_INTEGRITY_EVALUATOR_COMPATIBILITY_FAILED"),
+        (integrity.provenance_complete, "GATE_INTEGRITY_PROVENANCE_INCOMPLETE"),
+        (integrity.leakage_free, "GATE_INTEGRITY_DATA_LEAKAGE"),
+        (integrity.partial_inference_approved, "GATE_INTEGRITY_PARTIAL_INFERENCE"),
+        (integrity.provider_fallback_free, "GATE_INTEGRITY_PROVIDER_FALLBACK"),
+        (integrity.registry_inputs_match, "GATE_INTEGRITY_ARM_REGISTRY_MISMATCH"),
+    ):
+        if not valid:
+            failures.append(reason)
     return failures
 
 
@@ -249,18 +292,31 @@ def _infrastructure_failures(evidence: GateEvidence, charter: FrozenCharter) -> 
     if (
         runtime.hardware_baseline_manifest_sha256
         != charter.freeze_evidence.m0_hardware_baseline_manifest_sha256
+        or runtime.baseline_hardware_manifest_sha256
+        != charter.freeze_evidence.m0_hardware_baseline_manifest_sha256
+        or runtime.baseline_hardware_manifest_sha256 != runtime.hardware_baseline_manifest_sha256
     ):
         failures.append("GATE_INFRASTRUCTURE_HARDWARE_MISMATCH")
-    if not runtime.environment_valid:
+    if not runtime.environment_valid or not runtime.baseline_environment_valid:
         failures.append("GATE_INFRASTRUCTURE_CONTAMINATED_RUN")
-    if not runtime.gpu_provider_active:
+    if not runtime.gpu_provider_active or not runtime.baseline_gpu_provider_active:
         failures.append("GATE_INFRASTRUCTURE_GPU_PROVIDER_UNAVAILABLE")
-    if runtime.warmup_frames_per_block != 200 or runtime.measured_frames_per_block != 2000:
+    if (
+        runtime.warmup_frames_per_block != 200
+        or runtime.measured_frames_per_block != 2000
+        or runtime.baseline_warmup_frames_per_block != 200
+        or runtime.baseline_measured_frames_per_block != 2000
+    ):
         failures.append("GATE_INFRASTRUCTURE_RUNTIME_PROTOCOL_MISMATCH")
     if runtime.trial_blocks != 10:
         failures.append("GATE_INFRASTRUCTURE_TRIAL_BLOCK_COUNT_MISMATCH")
-    if runtime.trial_block_order != charter.runtime_bootstrap.balanced_order_schedule:
+    if (
+        runtime.trial_block_order != charter.runtime_bootstrap.balanced_order_schedule
+        or runtime.baseline_trial_block_order != charter.runtime_bootstrap.balanced_order_schedule
+    ):
         failures.append("GATE_INFRASTRUCTURE_TRIAL_ORDER_MISMATCH")
+    if not runtime.paired_trial_ids_match:
+        failures.append("GATE_INFRASTRUCTURE_TRIAL_PAIR_MISMATCH")
     return failures
 
 
@@ -288,9 +344,16 @@ def _absolute_performance_failures(evidence: GateEvidence, charter: FrozenCharte
 def _decision_from_interval(result: BootstrapResult, margin: float) -> tuple[ReleaseStatus, str]:
     if result.status != "VALID" or result.lower is None or result.upper is None:
         return "INSUFFICIENT_EVIDENCE", "GATE_INSUFFICIENT_FINITE_REPLICATES"
-    if result.lower >= -margin:
+    boundary = -margin
+    scale = max(1.0, abs(boundary), abs(result.lower), abs(result.upper))
+    tolerance = math.ulp(scale) * 64.0
+    if result.lower >= boundary or math.isclose(
+        result.lower, boundary, rel_tol=0.0, abs_tol=tolerance
+    ):
         return "PASS", "GATE_CELL_ACCEPTED"
-    if result.upper < -margin:
+    if result.upper < boundary and not math.isclose(
+        result.upper, boundary, rel_tol=0.0, abs_tol=tolerance
+    ):
         return "FAIL_REGRESSION", "GATE_REGRESSION_CI_BELOW_MARGIN"
     return "INSUFFICIENT_EVIDENCE", "GATE_INSUFFICIENT_INTERVAL_CROSSES_MARGIN"
 

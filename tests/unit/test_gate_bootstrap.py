@@ -130,3 +130,45 @@ def test_runtime_bootstrap_blocks_with_fewer_than_eight_pairs() -> None:
     )
 
     assert result.status == "INSUFFICIENT_FINITE"
+
+
+def test_bonferroni_interval_uses_declared_gating_family() -> None:
+    baseline = {
+        "segments": [
+            {"segment_id": f"s-{index}", "numerator": index % 2, "denominator": 1}
+            for index in range(20)
+        ]
+    }
+    candidate = {
+        "segments": [
+            {"segment_id": f"s-{index}", "numerator": (index + 1) % 2, "denominator": 1}
+            for index in range(20)
+        ]
+    }
+
+    ordinary = paired_segment_bootstrap(
+        baseline,
+        candidate,
+        estimator="ratio",
+        direction="higher_is_better",
+        family_alpha=0.05,
+        gating_cells=1,
+        replicates=10000,
+    )
+    adjusted = paired_segment_bootstrap(
+        baseline,
+        candidate,
+        estimator="ratio",
+        direction="higher_is_better",
+        family_alpha=0.05,
+        gating_cells=10,
+        replicates=10000,
+    )
+
+    assert adjusted.interval_alpha == 0.005
+    assert ordinary.lower is not None
+    assert ordinary.upper is not None
+    assert adjusted.lower is not None
+    assert adjusted.upper is not None
+    assert adjusted.lower <= ordinary.lower
+    assert adjusted.upper >= ordinary.upper

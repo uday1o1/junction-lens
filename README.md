@@ -27,6 +27,7 @@ See [Data manifests and V1 splits](docs/data-manifests-and-splits.md) for stream
 See [Visual and statistical data audit](docs/data-audit.md) for private calibration overlays, BEV labels, aggregate distributions, and slice-support previews.
 
 See [Acceptance charter and release decisions](docs/acceptance-charter.md) for the pre-holdout policy freeze, paired bootstrap, stable reason codes, and immutable decision workflow.
+See [Paired comparison and release decisions](docs/paired-comparison.md) for exact-frame pairing, slice materialization, persisted report data, and the public comparison command.
 
 See [E1 learned topology](docs/e1-learned-topology.md) for the directed edge heads, canonical matrix ordering, topology objective, and oracle-node versus predicted-node diagnostics.
 

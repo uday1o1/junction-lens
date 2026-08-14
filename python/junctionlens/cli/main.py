@@ -8,6 +8,7 @@ from typing import Annotated, cast
 
 import typer
 
+from junctionlens.cli.comparison import compare_command
 from junctionlens.cli.contract import contract_app
 from junctionlens.cli.data import data_app
 from junctionlens.cli.gate import gate_app
@@ -33,6 +34,7 @@ app.add_typer(contract_app, name="contract")
 app.add_typer(model_app, name="model")
 app.add_typer(registry_app, name="registry")
 app.add_typer(synthetic_app, name="synthetic")
+app.command("compare")(compare_command)
 
 
 @app.callback()
