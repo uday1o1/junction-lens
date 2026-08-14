@@ -737,12 +737,13 @@ class Runner:
             ):
                 visual_procedure = (
                     "\n## Licensed visual review\n\n"
-                    "Inspect every file below `<downloaded-result>/licensed-data/visual-audit`.\n"
+                    "Inspect every file below "
+                    "`<downloaded-result>/licensed-data/private-visual-audit`.\n"
                     "If and only if all four assertions are true, run this command from the "
                     "repository root.\n\n"
                     "```bash\n"
                     "uv run --locked junctionlens data signoff-visual-audit \\\n"
-                    "  --bundle <downloaded-result>/licensed-data/visual-audit \\\n"
+                    "  --bundle <downloaded-result>/licensed-data/private-visual-audit \\\n"
                     "  --accept-camera-projection-alignment \\\n"
                     "  --accept-bev-geometry-alignment \\\n"
                     "  --accept-label-identity-and-topology \\\n"

@@ -296,3 +296,6 @@ def test_core_profile_runs_mechanical_data_phase_before_visual_review(
     assert by_name["08c-licensed-visual-review"]["reason_code"] == (
         "LICENSED_VISUAL_AUDIT_REVIEW_REQUIRED"
     )
+    user_action = (result_root / "USER_ACTION_REQUIRED.md").read_text(encoding="utf-8")
+    assert "licensed-data/private-visual-audit" in user_action
+    assert "licensed-data/visual-audit" not in user_action
