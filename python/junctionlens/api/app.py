@@ -37,6 +37,10 @@ _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "X-Frame-Options": "DENY",
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "X-Permitted-Cross-Domain-Policies": "none",
     "Cache-Control": "no-store",
 }
 
@@ -252,7 +256,7 @@ def create_app(config: ServiceConfig) -> FastAPI:
     @app.get("/api/v1/images/{manifest_sha256}")
     def image(
         manifest_sha256: Annotated[str, ApiPath(pattern=_SHA256_PATTERN)],
-    ) -> StreamingResponse:
+    ) -> Response:
         try:
             artifact_value = repository.artifact(manifest_sha256)
             if artifact_value.media_type not in repository.image_media_types():
@@ -261,10 +265,7 @@ def create_app(config: ServiceConfig) -> FastAPI:
                     "API_IMAGE_TYPE_UNSUPPORTED",
                     "artifact is not a supported raster image",
                 )
-            payload = repository.open_payload(
-                manifest_sha256,
-                limit=config.max_image_bytes,
-            )
+            payload = repository.image_payload(manifest_sha256)
         except KeyError as error:
             raise ApiProblem(404, "API_ARTIFACT_NOT_FOUND", "artifact is not registered") from error
         except EvidenceReadError as error:
@@ -274,8 +275,8 @@ def create_app(config: ServiceConfig) -> FastAPI:
             "Content-Length": str(artifact_value.payload_byte_size),
             "X-JunctionLens-License": artifact_value.license_id,
         }
-        return StreamingResponse(
-            payload.chunks(),
+        return Response(
+            content=payload,
             media_type=artifact_value.media_type,
             headers=headers,
         )

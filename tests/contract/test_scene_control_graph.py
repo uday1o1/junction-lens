@@ -96,6 +96,17 @@ def test_unknown_json_field_fails_because_protojson_cannot_preserve_it() -> None
         parse_json(payload)
 
 
+def test_protojson_rejects_duplicate_keys_and_excessive_depth() -> None:
+    with pytest.raises(ContractViolation) as duplicate:
+        parse_json('{"schema_major":1,"schema_major":1}')
+    assert duplicate.value.reason_code == "CONTRACT_JSON_MALFORMED"
+
+    nested = '{"schema_major":1,"graph":' + "[" * 40 + "0" + "]" * 40 + "}"
+    with pytest.raises(ContractViolation) as deep:
+        parse_json(nested)
+    assert deep.value.reason_code == "CONTRACT_JSON_MALFORMED"
+
+
 def test_major_mismatch_has_stable_reason_code() -> None:
     envelope = make_golden_envelope()
     envelope.schema_major = 2

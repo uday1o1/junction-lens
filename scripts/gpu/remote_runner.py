@@ -19,6 +19,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PYTHON_ROOT = PROJECT_ROOT / "python"
+if str(PYTHON_ROOT) not in sys.path:
+    sys.path.insert(0, str(PYTHON_ROOT))
+
+from junctionlens.security.parsing import (  # noqa: E402
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object_path,
+)
+from junctionlens.security.redaction import redact_sensitive_text  # noqa: E402
+
 SCHEMA_VERSION = "junctionlens.remote-qualification.v1"
 MINIMUM_DRIVER = (570, 26)
 MINIMUM_DISK_BYTES = 50 * 1024**3
@@ -97,7 +109,7 @@ def _redact(value: str, replacements: dict[str, str]) -> str:
     ):
         if sensitive:
             result = result.replace(sensitive, replacement)
-    return result
+    return redact_sensitive_text(result)
 
 
 class Runner:
@@ -155,8 +167,12 @@ class Runner:
         if not status_path.is_file():
             return None
         try:
-            status = json.loads(status_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+            status = load_json_object_path(
+                status_path,
+                "remote phase status",
+                ParseLimits(max_bytes=1024 * 1024, max_depth=16, max_nodes=10_000),
+            )
+        except ParseBoundaryError:
             return None
         if status.get("input_sha256") != input_sha256 or status.get("status") != "PASSED":
             return None
@@ -299,10 +315,10 @@ class Runner:
         input_sha256 = self._phase_input_sha256(name, None)
         reused = self._reuse(name, input_sha256, True)
         if reused is not None:
-            status = json.loads(
-                (self._phase_root(name, input_sha256) / "environment.json").read_text(
-                    encoding="utf-8"
-                )
+            status = load_json_object_path(
+                self._phase_root(name, input_sha256) / "environment.json",
+                "remote qualification environment",
+                ParseLimits(max_bytes=4 * 1024 * 1024, max_depth=16, max_nodes=100_000),
             )
             self.environment = status
             self.selected_gpu_uuid = str(status["selected_gpu"]["uuid"])
@@ -570,7 +586,14 @@ class Runner:
 
 
 def _load_config(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        value = load_json_object_path(
+            path,
+            "remote runner configuration",
+            ParseLimits(max_bytes=1024 * 1024, max_depth=16, max_nodes=10_000),
+        )
+    except ParseBoundaryError as error:
+        raise QualificationError(str(error)) from error
     required = {"profile", "source_commit", "source_content_sha256"}
     if not isinstance(value, dict) or not required.issubset(value):
         raise QualificationError("remote runner configuration is invalid")
@@ -583,11 +606,15 @@ def _acquire_lock(lock_root: Path, source_digest: str) -> None:
     except FileExistsError:
         owner_path = lock_root / "owner.json"
         try:
-            owner = json.loads(owner_path.read_text(encoding="utf-8"))
+            owner = load_json_object_path(
+                owner_path,
+                "remote runner lock owner",
+                ParseLimits(max_bytes=64 * 1024, max_depth=8, max_nodes=1_000),
+            )
             pid = int(owner["pid"])
             same_bundle = owner["source_content_sha256"] == source_digest
             os.kill(pid, 0)
-        except (OSError, ValueError, KeyError, json.JSONDecodeError):
+        except (OSError, ValueError, KeyError, ParseBoundaryError):
             stale = lock_root.with_name(f"{lock_root.name}.stale-{int(time.time())}")
             lock_root.replace(stale)
             lock_root.mkdir()
@@ -703,10 +730,10 @@ def run(root: Path, result_root: Path, config: dict[str, Any]) -> str:
         phases.append(linux_verification)
         provider = runner.blocked_phase("05-cuda-provider-audit", "BLOCKED_BY_LINUX_VERIFICATION")
         if linux_verification.status == "PASSED":
-            export_report = json.loads(
-                (runner.root / "artifacts/m0/model-spike/model.export.json").read_text(
-                    encoding="utf-8"
-                )
+            export_report = load_json_object_path(
+                runner.root / "artifacts/m0/model-spike/model.export.json",
+                "model export report",
+                ParseLimits(max_bytes=4 * 1024 * 1024, max_depth=16, max_nodes=100_000),
             )
             profile_sha256 = str(export_report["profile_sha256"])
             provider_root = runner.result_root / "provider"
@@ -909,6 +936,10 @@ def main() -> int:
     try:
         status = run(source_root, result_root, _load_config(config_path))
     except (OSError, QualificationError, json.JSONDecodeError) as error:
+        detail = redact_sensitive_text(
+            str(error),
+            (source_root, result_root, config_path),
+        )
         result_root.mkdir(parents=True, exist_ok=True)
         _atomic_json(
             result_root / "status.json",
@@ -916,11 +947,11 @@ def main() -> int:
                 "schema_version": SCHEMA_VERSION,
                 "status": "FAILED",
                 "reason_code": "REMOTE_RUNNER_INTERNAL_ERROR",
-                "detail": str(error),
+                "detail": detail,
                 "generated_at": _utc_now(),
             },
         )
-        print(f"remote qualification error: {error}", file=sys.stderr)
+        print(f"remote qualification error: {detail}", file=sys.stderr)
         return 1
     return 0 if status == "PASSED" else 1
 

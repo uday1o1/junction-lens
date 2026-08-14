@@ -42,11 +42,11 @@ application_images:
     digest: null
     state: PENDING_REPRODUCIBLE_BUILD
   official_evaluator:
-    build_context_sha256: 729a8c668bc1feb72202e12c9c9e2ee2390aeeebe4c97acb9ff0ba69dc970525
-    config_sha256: b59fcbdf31e48134ed83a4638432a3867a294a2816e5c067e52aeeca14337b1c
+    build_context_sha256: 287bdaff92733cc4d7ba6e9ef7be9462d3d111edc42ab2d02043c969186df95d
+    config_sha256: f8c88d0f5ecc6823d5ed60d22ed04066345bc1fd5237aca72f3990054d08d0c7
     local_reference: junctionlens/official-evaluator:v2.1.0
-    oci_index_sha256: a3ae3c70d3d142602dfe25f5a542a4fbf118f8cdff7f015ebeb9e9928391855a
-    platform_manifest_sha256: 0c56735fec728624ee82b9e04dc9c7b39d27b4233e3d5242be74e85ba08f2d91
+    oci_index_sha256: f82aafd3c476eebb0f8f35bddc51b82d276ab7b1e0743857b4ef4937dc9c8d0e
+    platform_manifest_sha256: 47e8d5542614e5d59c3964c9607a91cb4247decfb37a222e8e95065386db88e2
     source_date_epoch: 1698810385
     state: ACCEPTED_LOCAL
   gpu:

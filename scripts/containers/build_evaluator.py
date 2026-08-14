@@ -84,6 +84,7 @@ def _prepare_context(root: Path) -> Path:
         root / "containers/evaluator_runner.py": context / "evaluator_runner.py",
         root / "containers/custom_match.py": context / "custom_match.py",
         root / "python/junctionlens/evaluator/payload.py": context / "evaluator_payload.py",
+        root / "python/junctionlens/security/parsing.py": context / "security_parsing.py",
         source: context / "openlane-v2-v2.1.0.tar.gz",
     }
     for source_path, destination in copies.items():

@@ -14,8 +14,16 @@ from typing import Any, cast
 
 from jsonschema import Draft202012Validator
 
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object,
+    read_bounded_file,
+)
+
 _HASH_BYTES = 32
 _MAX_MANIFEST_BYTES = 16 * 1024 * 1024
+_MAX_SCHEMA_BYTES = 4 * 1024 * 1024
 
 
 class RegistryError(RuntimeError):
@@ -43,27 +51,20 @@ def canonical_json_bytes(value: object) -> bytes:
 
 
 def _strict_json_object(payload: bytes, label: str) -> Mapping[str, Any]:
-    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, item in items:
-            if key in result:
-                raise RegistryError(f"duplicate JSON object key in {label}: {key}")
-            result[key] = item
-        return result
-
     try:
-        value = json.loads(
+        return load_json_object(
             payload,
-            object_pairs_hook=reject_duplicates,
-            parse_constant=lambda item: (_ for _ in ()).throw(
-                RegistryError(f"nonfinite JSON constant in {label}: {item}")
+            label,
+            ParseLimits(
+                max_bytes=_MAX_MANIFEST_BYTES,
+                max_depth=64,
+                max_nodes=250_000,
+                max_container_items=100_000,
+                max_string_bytes=4 * 1024 * 1024,
             ),
         )
-    except json.JSONDecodeError as error:
-        raise RegistryError(f"{label} contains invalid JSON") from error
-    if not isinstance(value, dict):
-        raise RegistryError(f"{label} must be an object")
-    return cast(Mapping[str, Any], value)
+    except ParseBoundaryError as error:
+        raise RegistryError(str(error)) from error
 
 
 def _sha256_file(path: Path) -> tuple[str, int]:
@@ -99,10 +100,13 @@ class ContentAddressedStore:
         if self.root.is_symlink():
             raise RegistryError("artifact root cannot be a symlink")
         try:
-            schema_bytes = schema_path.resolve(strict=True).read_bytes()
-            schema = json.loads(schema_bytes)
+            schema = load_json_object(
+                read_bounded_file(schema_path, "artifact manifest schema", _MAX_SCHEMA_BYTES),
+                "artifact manifest schema",
+                ParseLimits(max_bytes=_MAX_SCHEMA_BYTES, max_depth=64, max_nodes=250_000),
+            )
             Draft202012Validator.check_schema(schema)
-        except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
+        except (OSError, ParseBoundaryError, TypeError, ValueError) as error:
             raise RegistryError(f"invalid artifact manifest schema: {error}") from error
         self._validator = Draft202012Validator(schema)
         self.staging_root = self._safe_directory((".staging",), create=True)

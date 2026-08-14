@@ -1,0 +1,29 @@
+schema_version: junctionlens.native-components.v1
+components:
+  - name: abseil-cpp
+    version: "20250127.0"
+    license: Apache-2.0
+  - name: cuda-toolkit
+    version: "12.8.1"
+    license: LicenseRef-NVIDIA-CUDA-EULA
+  - name: cudnn
+    version: "9.14.0.64"
+    license: LicenseRef-NVIDIA-cuDNN-SLA
+  - name: eigen
+    version: "3.4.0"
+    license: MPL-2.0
+  - name: googletest
+    version: "1.16.0"
+    license: BSD-3-Clause
+  - name: onnxruntime
+    version: "1.25.0"
+    license: MIT
+  - name: opencv
+    version: "4.11.0"
+    license: Apache-2.0
+  - name: protobuf
+    version: "6.31.1"
+    license: BSD-3-Clause
+  - name: tensorrt
+    version: "10.14.1.48"
+    license: LicenseRef-NVIDIA-TensorRT-SLA

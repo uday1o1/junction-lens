@@ -15,6 +15,7 @@ from junctionlens.model.contract import output_contract
 from junctionlens.model.profile import M0ModelProfile
 from junctionlens.model.spike import INPUT_NAMES, OUTPUT_NAMES, M0GraphModel
 from junctionlens.model.synthetic import make_micro_inputs
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object
 
 
 class ParityError(RuntimeError):
@@ -61,8 +62,12 @@ def _native_outputs(
     if completed.returncode != 0:
         raise ParityError(f"native ONNX probe failed: {completed.stderr.strip()}")
     try:
-        payload = cast(dict[str, Any], json.loads(completed.stdout))
-    except (json.JSONDecodeError, TypeError) as error:
+        payload = load_json_object(
+            completed.stdout.encode(),
+            "native ONNX probe output",
+            ParseLimits(max_bytes=64 * 1024 * 1024, max_depth=24, max_nodes=2_000_000),
+        )
+    except (ParseBoundaryError, TypeError) as error:
         raise ParityError("native ONNX probe did not return valid JSON") from error
     if payload.get("status") != "PASSED":
         raise ParityError("native ONNX probe did not report PASSED")

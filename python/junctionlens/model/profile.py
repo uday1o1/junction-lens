@@ -7,8 +7,9 @@ import json
 from pathlib import Path
 from typing import Literal
 
-import yaml
 from pydantic import BaseModel, ConfigDict, Field
+
+from junctionlens.security.parsing import ParseLimits, load_yaml_object_path
 
 
 class _FrozenModel(BaseModel):
@@ -86,6 +87,9 @@ class M0ModelProfile(_FrozenModel):
 
 def load_m0_profile(path: Path) -> M0ModelProfile:
     """Load the exact M0 profile and reject unknown or changed fields."""
-    with path.open(encoding="utf-8") as source:
-        value = yaml.safe_load(source)
+    value = load_yaml_object_path(
+        path,
+        "M0 model profile",
+        ParseLimits(max_bytes=1024 * 1024, max_depth=16, max_nodes=10_000),
+    )
     return M0ModelProfile.model_validate(value)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import shutil
@@ -16,10 +15,16 @@ from typing import Any, Literal, cast
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
 from junctionlens.registry import ContentAddressedStore, RegistryError
 from junctionlens.registry.store import canonical_json_bytes
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object,
+    load_yaml_object_path,
+    read_bounded_file,
+)
 
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _GIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -33,31 +38,21 @@ class _Frozen(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-def _reject_duplicate_yaml_keys(node: Node) -> None:
-    if isinstance(node, MappingNode):
-        keys: set[str] = set()
-        for key_node, value_node in node.value:
-            if not isinstance(key_node, ScalarNode):
-                raise CharterError("charter YAML keys must be scalar")
-            if key_node.value in keys:
-                raise CharterError(f"charter contains duplicate YAML key {key_node.value}")
-            keys.add(key_node.value)
-            _reject_duplicate_yaml_keys(value_node)
-    elif isinstance(node, SequenceNode):
-        for item in node.value:
-            _reject_duplicate_yaml_keys(item)
-
-
 def _load_yaml(path: Path, label: str) -> object:
     try:
-        raw = path.read_text(encoding="utf-8")
-        node = yaml.compose(raw, Loader=yaml.SafeLoader)
-        if node is None:
-            raise CharterError(f"{label} is empty")
-        _reject_duplicate_yaml_keys(node)
-        return yaml.safe_load(raw)
-    except yaml.YAMLError as error:
-        raise CharterError(f"{label} is invalid YAML") from error
+        return load_yaml_object_path(
+            path,
+            label,
+            ParseLimits(
+                max_bytes=4 * 1024 * 1024,
+                max_depth=24,
+                max_nodes=100_000,
+                max_container_items=10_000,
+                max_string_bytes=256 * 1024,
+            ),
+        )
+    except ParseBoundaryError as error:
+        raise CharterError(str(error)) from error
 
 
 class BootstrapPolicy(_Frozen):
@@ -259,27 +254,20 @@ def _sha256_file(path: Path) -> str:
 
 
 def _load_json_bytes(raw: bytes, label: str) -> Mapping[str, Any]:
-    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result = {}
-        for key, value in items:
-            if key in result:
-                raise CharterError(f"{label} contains duplicate JSON key {key}")
-            result[key] = value
-        return result
-
     try:
-        value = json.loads(
+        return load_json_object(
             raw,
-            object_pairs_hook=reject_duplicates,
-            parse_constant=lambda item: (_ for _ in ()).throw(
-                CharterError(f"{label} contains nonfinite constant {item}")
+            label,
+            ParseLimits(
+                max_bytes=64 * 1024 * 1024,
+                max_depth=24,
+                max_nodes=1_000_000,
+                max_container_items=100_000,
+                max_string_bytes=4 * 1024 * 1024,
             ),
         )
-    except json.JSONDecodeError as error:
-        raise CharterError(f"{label} is invalid JSON") from error
-    if not isinstance(value, dict):
-        raise CharterError(f"{label} must be an object")
-    return cast(Mapping[str, Any], value)
+    except ParseBoundaryError as error:
+        raise CharterError(str(error)) from error
 
 
 def _source_commit(project_root: Path) -> str:
@@ -443,7 +431,15 @@ def freeze_charter(
     if not isinstance(payload, dict):
         raise CharterError("baseline run artifact payload is invalid")
     payload_path = store.object_path(str(payload.get("sha256")))
-    evidence = _load_json_bytes(payload_path.read_bytes(), "baseline freeze evidence")
+    try:
+        evidence_bytes = read_bounded_file(
+            payload_path,
+            "baseline freeze evidence",
+            64 * 1024 * 1024,
+        )
+    except ParseBoundaryError as error:
+        raise CharterError(str(error)) from error
+    evidence = _load_json_bytes(evidence_bytes, "baseline freeze evidence")
     frozen_margins = _validate_freeze_evidence(evidence, draft)
     source_commit = _source_commit(project_root)
     if not metrics_path.is_file() or metrics_path.is_symlink():

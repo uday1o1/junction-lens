@@ -9,7 +9,7 @@ import time
 from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import torch
 from torch import Tensor
@@ -40,6 +40,7 @@ from junctionlens.model.e1_losses import E1Targets, e1_losses, weighted_e1_total
 from junctionlens.model.e1_profile import E1Profile
 from junctionlens.model.selection import apply_frozen_early_stopping, score_order
 from junctionlens.model.topology import JointGraphModel, e1_outputs_by_name
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object_path
 
 
 class E1TrainingError(RuntimeError):
@@ -57,30 +58,19 @@ def _validate_sha256(value: object, label: str) -> str:
 
 
 def _load_json_object(path: Path, label: str) -> Mapping[str, Any]:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 16 * 1024 * 1024:
-        raise E1TrainingError(f"{label} must be a bounded regular file")
-
-    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, item in items:
-            if key in result:
-                raise E1TrainingError(f"duplicate JSON object key: {key}")
-            result[key] = item
-        return result
-
     try:
-        value = json.loads(
-            path.read_bytes(),
-            object_pairs_hook=reject_duplicates,
-            parse_constant=lambda item: (_ for _ in ()).throw(
-                E1TrainingError(f"nonfinite JSON constant: {item}")
+        return load_json_object_path(
+            path,
+            label,
+            ParseLimits(
+                max_bytes=16 * 1024 * 1024,
+                max_depth=24,
+                max_nodes=500_000,
+                max_container_items=100_000,
             ),
         )
-    except json.JSONDecodeError as error:
-        raise E1TrainingError(f"{label} is invalid JSON") from error
-    if not isinstance(value, dict):
-        raise E1TrainingError(f"{label} must be an object")
-    return cast(Mapping[str, Any], value)
+    except ParseBoundaryError as error:
+        raise E1TrainingError(str(error)) from error
 
 
 def _validate_diagnostic(path: Path, base: E0Profile, profile: E1Profile) -> str:

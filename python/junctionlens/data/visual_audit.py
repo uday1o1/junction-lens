@@ -17,13 +17,18 @@ from typing import Any, cast
 
 import numpy as np
 import numpy.typing as npt
-import yaml
 from PIL import Image, ImageDraw
 
 from junctionlens.data.contracts import AdaptedFrame, CameraFrame, Point3
 from junctionlens.data.geometry import project_vehicle_points
 from junctionlens.data.openlane import OpenLaneAdapter, OpenLaneAdapterError
 from junctionlens.registry.store import canonical_json_bytes
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_yaml_object,
+    read_bounded_file,
+)
 
 FloatArray = npt.NDArray[np.float64]
 _AUDIT_POLICY_KEYS = {
@@ -143,12 +148,16 @@ def _pair(
 
 def load_audit_policy(path: Path) -> AuditPolicy:
     """Load the exact V1 aggregate and manual-inspection policy."""
-    raw = path.read_bytes()
     try:
-        value = yaml.safe_load(raw)
-    except yaml.YAMLError as error:
-        raise VisualAuditError(f"invalid audit policy YAML: {error}") from error
-    if not isinstance(value, dict) or set(value) != _AUDIT_POLICY_KEYS:
+        raw = read_bounded_file(path, "audit policy", 4 * 1024 * 1024)
+        value = load_yaml_object(
+            raw,
+            "audit policy",
+            ParseLimits(max_bytes=4 * 1024 * 1024, max_depth=24, max_nodes=100_000),
+        )
+    except ParseBoundaryError as error:
+        raise VisualAuditError(str(error)) from error
+    if set(value) != _AUDIT_POLICY_KEYS:
         raise VisualAuditError("audit policy has invalid top-level keys")
     if (
         value["schema_version"] != "junctionlens.openlane-audit-policy.v1"
@@ -170,17 +179,27 @@ def load_audit_policy(path: Path) -> AuditPolicy:
         registry_path.relative_to(config_root)
     except ValueError as error:
         raise VisualAuditError("slice registry path escapes the configuration root") from error
-    registry_bytes = registry_path.read_bytes()
+    try:
+        registry_bytes = read_bounded_file(
+            registry_path,
+            "slice registry",
+            4 * 1024 * 1024,
+        )
+    except ParseBoundaryError as error:
+        raise VisualAuditError(str(error)) from error
     registry_sha256 = hashlib.sha256(registry_bytes).hexdigest()
     if registry_contract["sha256"] != registry_sha256:
         raise VisualAuditError("slice registry differs from its audit-policy hash")
     try:
-        registry = yaml.safe_load(registry_bytes)
-    except yaml.YAMLError as error:
-        raise VisualAuditError(f"invalid slice registry YAML: {error}") from error
+        registry = load_yaml_object(
+            registry_bytes,
+            "slice registry",
+            ParseLimits(max_bytes=4 * 1024 * 1024, max_depth=24, max_nodes=100_000),
+        )
+    except ParseBoundaryError as error:
+        raise VisualAuditError(str(error)) from error
     if (
-        not isinstance(registry, dict)
-        or set(registry) != {"registry_id", "schema_version", "slices"}
+        set(registry) != {"registry_id", "schema_version", "slices"}
         or registry["schema_version"] != "junctionlens.slice-registry.v1"
         or registry["registry_id"] != "junctionlens-openlane-slices-v1"
         or not isinstance(registry["slices"], list)

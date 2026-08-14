@@ -15,6 +15,8 @@ from typing import Any
 
 from junctionlens.model.profile import load_m0_profile
 from junctionlens.runtime import load_runtime_qualification
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object_path
+from junctionlens.security.redaction import redact_sensitive_text
 from scripts.gpu.qualify_runtime import write_synthetic_runtime_fixture
 
 
@@ -37,7 +39,7 @@ def _redact(value: str, replacements: dict[str, str]) -> str:
     ):
         if sensitive:
             result = result.replace(sensitive, replacement)
-    return result
+    return redact_sensitive_text(result)
 
 
 def _runtime_command(arguments: argparse.Namespace, input_list: Path, raw: Path) -> list[str]:
@@ -136,7 +138,14 @@ def run(arguments: argparse.Namespace) -> dict[str, Any]:
     onnx_profiles = sorted(output.glob("onnx-profile*.json"))
     if completed.returncode != 0 or len(traces) != 1 or len(onnx_profiles) != 1:
         raise ProfilerError("profiler run did not produce exactly one Nsight and ONNX trace")
-    raw_report = json.loads(raw.read_text(encoding="utf-8"))
+    try:
+        raw_report = load_json_object_path(
+            raw,
+            "profiler native output",
+            ParseLimits(max_bytes=64 * 1024 * 1024, max_depth=32, max_nodes=2_000_000),
+        )
+    except ParseBoundaryError as error:
+        raise ProfilerError(str(error)) from error
     if raw_report.get("profiler_run") is not True or raw_report.get("publishable") is not False:
         raise ProfilerError("profiler run was not isolated from benchmark evidence")
     report = {

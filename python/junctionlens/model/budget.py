@@ -5,8 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_yaml_object_path
 
 
 class BudgetError(RuntimeError):
@@ -108,9 +109,12 @@ class BudgetPlan(_FrozenModel):
 
 def load_budget_plan(path: Path) -> BudgetPlan:
     """Load and fail closed on any budget, seed, cadence, or retention drift."""
-    with path.open(encoding="utf-8") as source:
-        value = yaml.safe_load(source)
     try:
+        value = load_yaml_object_path(
+            path,
+            "experiment budget plan",
+            ParseLimits(max_bytes=1024 * 1024, max_depth=16, max_nodes=10_000),
+        )
         return BudgetPlan.model_validate(value)
-    except ValueError as error:
+    except (ParseBoundaryError, ValueError) as error:
         raise BudgetError(f"invalid budget plan: {error}") from error

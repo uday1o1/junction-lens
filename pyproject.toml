@@ -24,30 +24,32 @@ dependencies = [
 [project.optional-dependencies]
 analytics = [
   "polars==1.31.0",
-  "pyarrow==20.0.0",
+  "pyarrow==23.0.1",
 ]
 cpu = [
   "numpy==2.2.6",
-  "onnx==1.18.0",
+  "onnx==1.22.0",
   "onnx-ir==1.0.0",
   "onnxscript==0.7.1",
   "onnxruntime==1.25.0",
   "scipy==1.15.3",
-  "torch==2.8.0",
-  "torchvision==0.23.0",
+  "torch==2.11.0",
+  "torchvision==0.26.0",
 ]
 cuda = [
   "numpy==2.2.6; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "onnx==1.18.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "onnx==1.22.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "onnx-ir==1.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "onnxscript==0.7.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "onnxruntime-gpu==1.25.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "scipy==1.15.3; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "torch==2.8.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "torchvision==0.23.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torch==2.11.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchvision==0.26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 service = [
-  "fastapi==0.116.1",
+  "fastapi==0.141.1",
+  "pyarrow==23.0.1",
+  "starlette==1.3.1",
   "uvicorn==0.35.0",
 ]
 
@@ -58,8 +60,9 @@ junctionlens = "junctionlens.cli.main:app"
 dev = [
   "coverage==7.10.1",
   "hypothesis==6.136.6",
-  "httpx==0.28.1",
+  "httpx2==2.10.0",
   "mypy==1.17.0",
+  "pip-audit==2.10.1",
   "pytest==8.4.1",
   "pytest-cov==6.2.1",
   "ruff==0.12.7",

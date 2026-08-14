@@ -18,6 +18,7 @@ from typing import Any
 
 from junctionlens.model.profile import load_m0_profile
 from junctionlens.runtime import analyze_native_benchmark, load_runtime_qualification
+from junctionlens.security.redaction import redact_sensitive_text
 from scripts.gpu.qualify_runtime import write_synthetic_runtime_fixture
 
 
@@ -44,7 +45,7 @@ def _redact(value: str, replacements: dict[str, str]) -> str:
     ):
         if sensitive:
             result = result.replace(sensitive, replacement)
-    return result
+    return redact_sensitive_text(result)
 
 
 def _float(value: str, label: str) -> float:

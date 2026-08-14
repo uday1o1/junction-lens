@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Annotated, Any, cast
 
 import typer
-import yaml
 
 from junctionlens.cli.output import emit
 from junctionlens.data.audit import audit_report
@@ -41,6 +40,7 @@ from junctionlens.data.visual_audit import (
 from junctionlens.evaluator.official import EvaluationError
 from junctionlens.registry import ContentAddressedStore, RegistryError
 from junctionlens.registry.store import canonical_json_bytes
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_yaml_object_path
 
 data_app = typer.Typer(help="Acknowledge, register, audit, and verify licensed datasets.")
 
@@ -179,11 +179,11 @@ def audit_command(
     """Audit all declared labels and source identities in a registered profile."""
     try:
         selected_root = _registered_root(dataset_id, profile, root)
-        with config_path.open(encoding="utf-8") as source:
-            raw_config = yaml.safe_load(source)
-        if not isinstance(raw_config, dict):
-            raise DatasetRegistrationError("adapter config must be a mapping")
-        config = cast(dict[str, Any], raw_config)
+        config = load_yaml_object_path(
+            config_path,
+            "adapter config",
+            ParseLimits(max_bytes=1024 * 1024, max_depth=16, max_nodes=10_000),
+        )
         capacities = cast(dict[str, int], config["query_capacities"])
         identity = cast(dict[str, float], config["identity_audit"])
         continuity = {
@@ -204,7 +204,7 @@ def audit_command(
         KeyError,
         TypeError,
         ValueError,
-        yaml.YAMLError,
+        ParseBoundaryError,
     ) as error:
         _fail(error)
         return
@@ -244,9 +244,9 @@ def verify_adapter_command(
         EvaluationError,
         OpenLaneAdapterError,
         OSError,
+        ParseBoundaryError,
         TypeError,
         ValueError,
-        yaml.YAMLError,
     ) as error:
         _fail(error)
         return
@@ -294,10 +294,10 @@ def manifest_command(
         ManifestError,
         OpenLaneAdapterError,
         OSError,
+        ParseBoundaryError,
         RegistryError,
         TypeError,
         ValueError,
-        yaml.YAMLError,
     ) as error:
         _fail(error)
         return
@@ -460,10 +460,10 @@ def visual_audit_command(
         DatasetRegistrationError,
         OSError,
         OpenLaneAdapterError,
+        ParseBoundaryError,
         TypeError,
         ValueError,
         VisualAuditError,
-        yaml.YAMLError,
     ) as error:
         _fail(error)
         return

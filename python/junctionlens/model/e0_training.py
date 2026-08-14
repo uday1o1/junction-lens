@@ -13,7 +13,7 @@ import time
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 import torch
@@ -38,6 +38,7 @@ from junctionlens.model.e0_profile import E0Profile
 from junctionlens.model.reference import ReferenceNodeModel, e0_outputs_by_name
 from junctionlens.model.selection import apply_frozen_early_stopping, score_order
 from junctionlens.registry.store import canonical_json_bytes
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object_path
 
 
 class E0TrainingError(RuntimeError):
@@ -266,30 +267,19 @@ def _write_immutable_json(path: Path, payload: object) -> None:
 
 
 def _load_score_json(path: Path) -> Mapping[str, Any]:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 16 * 1024 * 1024:
-        raise E0TrainingError("E0 selection scores must be a bounded regular file")
-
-    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result = {}
-        for key, item in items:
-            if key in result:
-                raise E0TrainingError(f"duplicate JSON object key: {key}")
-            result[key] = item
-        return result
-
     try:
-        value = json.loads(
-            path.read_bytes(),
-            object_pairs_hook=reject_duplicates,
-            parse_constant=lambda item: (_ for _ in ()).throw(
-                E0TrainingError(f"nonfinite JSON constant: {item}")
+        return load_json_object_path(
+            path,
+            "E0 selection scores",
+            ParseLimits(
+                max_bytes=16 * 1024 * 1024,
+                max_depth=24,
+                max_nodes=500_000,
+                max_container_items=100_000,
             ),
         )
-    except json.JSONDecodeError as error:
-        raise E0TrainingError("E0 selection scores are invalid JSON") from error
-    if not isinstance(value, dict):
-        raise E0TrainingError("E0 selection scores must be an object")
-    return value
+    except ParseBoundaryError as error:
+        raise E0TrainingError(str(error)) from error
 
 
 def _checkpoint(
@@ -425,12 +415,14 @@ def run_e0_training(
     metrics_mode = "x"
     if resume:
         try:
-            existing = json.loads(manifest_path.read_bytes())
-        except (OSError, json.JSONDecodeError) as error:
+            existing = load_json_object_path(
+                manifest_path,
+                "existing E0 run manifest",
+                ParseLimits(max_bytes=16 * 1024 * 1024, max_depth=24, max_nodes=500_000),
+            )
+        except (OSError, ParseBoundaryError) as error:
             raise E0TrainingError("cannot load the existing E0 run manifest") from error
-        if not isinstance(existing, dict):
-            raise E0TrainingError("existing E0 run manifest is not an object")
-        run_manifest = cast(dict[str, Any], existing)
+        run_manifest = existing
         if run_manifest.get("state") == "TRAINING_COMPLETE_AWAITING_FROZEN_SELECTION":
             return run_manifest
         for key in (
@@ -451,8 +443,15 @@ def run_e0_training(
         receipts = sorted(checkpoint_root.glob("epoch-*.json"))
         if not receipts:
             raise E0TrainingError("resume requested but no durable checkpoint receipt exists")
-        receipt = json.loads(receipts[-1].read_bytes())
-        if not isinstance(receipt, dict) or not isinstance(receipt.get("epoch"), int):
+        try:
+            receipt = load_json_object_path(
+                receipts[-1],
+                "E0 checkpoint receipt",
+                ParseLimits(max_bytes=1024 * 1024, max_depth=16, max_nodes=10_000),
+            )
+        except ParseBoundaryError as error:
+            raise E0TrainingError(str(error)) from error
+        if not isinstance(receipt.get("epoch"), int):
             raise E0TrainingError("latest E0 checkpoint receipt is invalid")
         last_epoch = int(receipt["epoch"])
         checkpoint_path = checkpoint_root / f"epoch-{last_epoch:02d}.pt"

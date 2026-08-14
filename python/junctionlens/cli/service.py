@@ -9,6 +9,7 @@ from typing import Annotated
 import typer
 
 from junctionlens.cli.output import emit, human_requested
+from junctionlens.security.redaction import redact_sensitive_text
 
 
 def _error(code: str, message: str) -> str:
@@ -76,7 +77,8 @@ def serve_command(
             open_browser=open_browser,
         )
     except (EvidenceReadError, ImportError, OSError, RuntimeError, ValueError) as error:
-        typer.echo(_error("SERVE_CONFIGURATION_INVALID", str(error)), err=True)
+        message = redact_sensitive_text(str(error), (artifact_root, schema, web_root))
+        typer.echo(_error("SERVE_CONFIGURATION_INVALID", message), err=True)
         raise typer.Exit(code=2) from error
 
 

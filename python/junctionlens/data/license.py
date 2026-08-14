@@ -11,7 +11,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
-import yaml
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object_path,
+    load_yaml_object_path,
+)
 
 
 class DatasetRegistrationError(RuntimeError):
@@ -19,11 +24,14 @@ class DatasetRegistrationError(RuntimeError):
 
 
 def _load_lock(lock_path: Path) -> Mapping[str, Any]:
-    with lock_path.open(encoding="utf-8") as source:
-        value = yaml.safe_load(source)
-    if not isinstance(value, dict):
-        raise DatasetRegistrationError("dataset lock must be a mapping")
-    return cast(Mapping[str, Any], value)
+    try:
+        return load_yaml_object_path(
+            lock_path,
+            "dataset lock",
+            ParseLimits(max_bytes=4 * 1024 * 1024, max_depth=24, max_nodes=100_000),
+        )
+    except ParseBoundaryError as error:
+        raise DatasetRegistrationError(str(error)) from error
 
 
 def _canonical_hash(value: object) -> str:
@@ -156,16 +164,14 @@ def load_valid_acknowledgment(
         raise DatasetRegistrationError(
             "license acknowledgment is missing; run `junctionlens data acknowledge`"
         )
-    if receipt_path.stat().st_size > 64 * 1024:
-        raise DatasetRegistrationError("license receipt exceeds 64 KiB")
     try:
-        with receipt_path.open(encoding="utf-8") as source:
-            value = json.load(source)
-    except json.JSONDecodeError as error:
-        raise DatasetRegistrationError(f"invalid license receipt: {error}") from error
-    if not isinstance(value, dict):
-        raise DatasetRegistrationError("license receipt must be an object")
-    receipt = cast(Mapping[str, Any], value)
+        receipt = load_json_object_path(
+            receipt_path,
+            "license receipt",
+            ParseLimits(max_bytes=64 * 1024, max_depth=12, max_nodes=10_000),
+        )
+    except ParseBoundaryError as error:
+        raise DatasetRegistrationError(str(error)) from error
     expected_contract_hash = _canonical_hash(_license_contract(lock))
     if receipt.get("license_contract_sha256") != expected_contract_hash:
         raise DatasetRegistrationError("license receipt does not match the current lock contract")
@@ -243,7 +249,7 @@ def register_dataset(
         raise DatasetRegistrationError(
             f"archive checksum mismatch for {archive_name}: expected {expected_md5}, observed {md5}"
         )
-    manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    manifest_sha256 = _hash_file(manifest_path)[1]
     registration: Mapping[str, Any] = {
         "schema_version": "1.0.0",
         "dataset_id": lock.get("dataset_id"),
@@ -280,13 +286,14 @@ def load_registration(
             "dataset profile is not registered; run "
             f"`junctionlens data register --profile {profile}`"
         )
-    if receipt_path.stat().st_size > 64 * 1024:
-        raise DatasetRegistrationError("dataset registration receipt exceeds 64 KiB")
     try:
-        with receipt_path.open(encoding="utf-8") as source:
-            value = json.load(source)
-    except json.JSONDecodeError as error:
-        raise DatasetRegistrationError(f"invalid dataset registration receipt: {error}") from error
-    if not isinstance(value, dict) or value.get("dataset_id") != dataset_id:
+        value = load_json_object_path(
+            receipt_path,
+            "dataset registration receipt",
+            ParseLimits(max_bytes=64 * 1024, max_depth=12, max_nodes=10_000),
+        )
+    except ParseBoundaryError as error:
+        raise DatasetRegistrationError(str(error)) from error
+    if value.get("dataset_id") != dataset_id:
         raise DatasetRegistrationError("dataset registration receipt identity mismatch")
-    return cast(Mapping[str, Any], value)
+    return value

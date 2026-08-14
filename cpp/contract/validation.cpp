@@ -24,6 +24,11 @@ namespace {
 
 using Envelope = v1::SceneControlGraphEnvelope;
 
+constexpr int kMaximumGenericRepeatedValues = 10'000;
+constexpr std::size_t kMaximumStringBytes = 1024U * 1024U;
+constexpr std::size_t kMaximumVisitedValues = 1'000'000U;
+constexpr int kMaximumMessageDepth = 32;
+
 [[nodiscard]] ValidationResult Pass() { return {true, "OK", "", ""}; }
 
 [[nodiscard]] ValidationResult Fail(std::string reason_code, std::string path, std::string detail) {
@@ -64,6 +69,76 @@ using Envelope = v1::SceneControlGraphEnvelope;
           return Fail("CONTRACT_NONFINITE", field_path, "floating-point values must be finite");
         }
       }
+    }
+  }
+  return Pass();
+}
+
+[[nodiscard]] ValidationResult ValidateResourceBudget(const google::protobuf::Message& message,
+                                                      const std::string& path, int depth,
+                                                      std::size_t& visited_values) {
+  if (depth > kMaximumMessageDepth) {
+    return Fail("CONTRACT_DEPTH_LIMIT", path, "message exceeds the nesting-depth limit");
+  }
+  const auto* reflection = message.GetReflection();
+  std::vector<const google::protobuf::FieldDescriptor*> fields;
+  reflection->ListFields(message, &fields);
+  for (const auto* field : fields) {
+    const int count = field->is_repeated() ? reflection->FieldSize(message, field) : 1;
+    const std::string field_name(field->name().data(), field->name().size());
+    const std::string field_path = path + "." + field_name;
+    if (count > kMaximumGenericRepeatedValues) {
+      return Fail("CONTRACT_OBJECT_LIMIT", field_path,
+                  "repeated field exceeds the generic object-count limit");
+    }
+    visited_values += static_cast<std::size_t>(count);
+    if (visited_values > kMaximumVisitedValues) {
+      return Fail("CONTRACT_OBJECT_LIMIT", field_path,
+                  "message exceeds the total value-count limit");
+    }
+    for (int index = 0; index < count; ++index) {
+      if (field->cpp_type() == google::protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
+        const auto& child = field->is_repeated()
+                                ? reflection->GetRepeatedMessage(message, field, index)
+                                : reflection->GetMessage(message, field);
+        auto result = ValidateResourceBudget(child, field_path, depth + 1, visited_values);
+        if (!result.valid) {
+          return result;
+        }
+      } else if (field->cpp_type() == google::protobuf::FieldDescriptor::CPPTYPE_STRING) {
+        const auto value = field->is_repeated()
+                               ? reflection->GetRepeatedString(message, field, index)
+                               : reflection->GetString(message, field);
+        if (value.size() > kMaximumStringBytes) {
+          return Fail("CONTRACT_STRING_LIMIT", field_path, "string exceeds the encoded-byte limit");
+        }
+      }
+    }
+  }
+  return Pass();
+}
+
+[[nodiscard]] ValidationResult ValidateGraphCounts(const v1::SceneControlGraph& graph) {
+  struct Limit {
+    int observed;
+    int maximum;
+    const char* path;
+  };
+  constexpr int kMaximumCameras = 16;
+  const int cameras = graph.has_sensor_frame() ? graph.sensor_frame().cameras_size() : 0;
+  const std::array<Limit, 8> limits{{
+      {cameras, kMaximumCameras, "graph.sensor_frame.cameras"},
+      {graph.lanes_size(), 512, "graph.lanes"},
+      {graph.traffic_controls_size(), 256, "graph.traffic_controls"},
+      {graph.road_areas_size(), 256, "graph.road_areas"},
+      {graph.edges_size(), 2048, "graph.edges"},
+      {graph.tracks_size(), 2048, "graph.tracks"},
+      {graph.raw_tensor_artifacts_size(), 256, "graph.raw_tensor_artifacts"},
+      {graph.warnings_size(), 256, "graph.warnings"},
+  }};
+  for (const auto& limit : limits) {
+    if (limit.observed > limit.maximum) {
+      return Fail("CONTRACT_OBJECT_LIMIT", limit.path, "collection exceeds its object-count limit");
     }
   }
   return Pass();
@@ -182,7 +257,12 @@ using Envelope = v1::SceneControlGraphEnvelope;
 void VerifyExactProtobufRuntime() { GOOGLE_PROTOBUF_VERIFY_VERSION; }
 
 ValidationResult Validate(const Envelope& envelope) {
-  auto result = ValidateFinite(envelope, "envelope");
+  std::size_t visited_values = 0U;
+  auto result = ValidateResourceBudget(envelope, "envelope", 1, visited_values);
+  if (!result.valid) {
+    return result;
+  }
+  result = ValidateFinite(envelope, "envelope");
   if (!result.valid) {
     return result;
   }
@@ -190,6 +270,10 @@ ValidationResult Validate(const Envelope& envelope) {
     return Fail("CONTRACT_SCHEMA_MAJOR", "schema_major", "expected 1");
   }
   const auto& graph = envelope.graph();
+  result = ValidateGraphCounts(graph);
+  if (!result.valid) {
+    return result;
+  }
   if (graph.role() == v1::GRAPH_ROLE_UNSPECIFIED) {
     return Fail("CONTRACT_ENUM_UNSPECIFIED", "graph.role", "graph role is required");
   }

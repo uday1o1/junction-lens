@@ -200,7 +200,9 @@ def export_model(
     model.eval()
     inputs = make_micro_inputs(
         profile,
-        torch.tensor([0], dtype=torch.int64),
+        # PyTorch 2.11 specializes a named dimension observed only at its lower
+        # bound.  A batch-two witness keeps the declared batch dimension symbolic.
+        torch.tensor([0, 1], dtype=torch.int64),
         spatial_size=(profile.input.height, profile.input.width),
     )
     batch_dimension = torch.export.Dim("batch", min=1)

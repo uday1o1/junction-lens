@@ -2,10 +2,24 @@
 
 from __future__ import annotations
 
-import json
 import math
 from pathlib import Path
 from typing import Any
+
+if __package__:
+    from junctionlens.security.parsing import (
+        ParseBoundaryError,
+        ParseLimits,
+        load_json_object,
+        read_bounded_file,
+    )
+else:
+    from security_parsing import (  # type: ignore[import-not-found, no-redef]
+        ParseBoundaryError,
+        ParseLimits,
+        load_json_object,
+        read_bounded_file,
+    )
 
 MAX_INPUT_BYTES = 16 * 1024 * 1024
 MAX_FRAMES = 1_000
@@ -252,12 +266,13 @@ def validate_payload(value: object) -> dict[str, Any]:
 
 def load_payload(path: Path) -> dict[str, Any]:
     """Read one bounded UTF-8 JSON file and validate its complete structure."""
-    stat = path.stat()
-    if not path.is_file() or stat.st_size > MAX_INPUT_BYTES:
+    try:
+        payload = read_bounded_file(path, "evaluator input", MAX_INPUT_BYTES)
+    except ParseBoundaryError as error:
         raise EvaluatorPayloadError(
-            f"input must be a regular file no larger than {MAX_INPUT_BYTES} bytes"
-        )
-    return parse_payload_bytes(path.read_bytes())
+            f"input must be a regular file no larger than {MAX_INPUT_BYTES} bytes: {error}"
+        ) from error
+    return parse_payload_bytes(payload)
 
 
 def parse_payload_bytes(raw_bytes: bytes) -> dict[str, Any]:
@@ -265,25 +280,17 @@ def parse_payload_bytes(raw_bytes: bytes) -> dict[str, Any]:
     if len(raw_bytes) > MAX_INPUT_BYTES:
         raise EvaluatorPayloadError(f"input must be no larger than {MAX_INPUT_BYTES} bytes")
     try:
-        source = raw_bytes.decode("utf-8")
-        value = json.loads(
-            source,
-            object_pairs_hook=_object_without_duplicate_keys,
-            parse_constant=lambda value: _reject_constant(value),
+        value = load_json_object(
+            raw_bytes,
+            "evaluator input",
+            ParseLimits(
+                max_bytes=MAX_INPUT_BYTES,
+                max_depth=32,
+                max_nodes=1_000_000,
+                max_container_items=100_000,
+                max_string_bytes=4 * 1024 * 1024,
+            ),
         )
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+    except ParseBoundaryError as error:
         raise EvaluatorPayloadError(f"input is not valid strict UTF-8 JSON: {error}") from error
     return validate_payload(value)
-
-
-def _reject_constant(value: str) -> None:
-    raise EvaluatorPayloadError(f"JSON constant {value} is not permitted")
-
-
-def _object_without_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for key, value in pairs:
-        if key in result:
-            raise EvaluatorPayloadError(f"duplicate JSON object key is not permitted: {key}")
-        result[key] = value
-    return result

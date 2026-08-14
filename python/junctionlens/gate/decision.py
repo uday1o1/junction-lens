@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import os
 import tempfile
@@ -21,6 +20,11 @@ from junctionlens.gate.bootstrap import (
 )
 from junctionlens.gate.charter import CharterCell, CharterError, FrozenCharter, load_frozen_charter
 from junctionlens.registry.store import canonical_json_bytes
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object_path,
+)
 
 ReleaseStatus = Literal[
     "PASS",
@@ -141,30 +145,20 @@ def _sha256_file(path: Path) -> str:
 
 
 def _load_json(path: Path) -> Mapping[str, Any]:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 128 * 1024 * 1024:
-        raise DecisionError("gate evidence must be a bounded regular JSON file")
-
-    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, value in items:
-            if key in result:
-                raise DecisionError(f"gate evidence contains duplicate JSON key {key}")
-            result[key] = value
-        return result
-
     try:
-        value = json.loads(
-            path.read_bytes(),
-            object_pairs_hook=reject_duplicates,
-            parse_constant=lambda item: (_ for _ in ()).throw(
-                DecisionError(f"gate evidence contains nonfinite constant {item}")
+        return load_json_object_path(
+            path,
+            "gate evidence",
+            ParseLimits(
+                max_bytes=128 * 1024 * 1024,
+                max_depth=32,
+                max_nodes=2_000_000,
+                max_container_items=1_000_000,
+                max_string_bytes=4 * 1024 * 1024,
             ),
         )
-    except json.JSONDecodeError as error:
-        raise DecisionError("gate evidence is invalid JSON") from error
-    if not isinstance(value, dict):
-        raise DecisionError("gate evidence must be a JSON object")
-    return cast(Mapping[str, Any], value)
+    except ParseBoundaryError as error:
+        raise DecisionError(str(error)) from error
 
 
 def load_gate_evidence(path: Path) -> GateEvidence:

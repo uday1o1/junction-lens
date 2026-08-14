@@ -86,15 +86,17 @@ class RuntimeFixture(_Strict):
 
     @model_validator(mode="after")
     def validate_runtime(self) -> RuntimeFixture:
-        if not self.provider_node_counts or any(
-            not name or count < 0 for name, count in self.provider_node_counts.items()
+        if (
+            not self.provider_node_counts
+            or any(not name or count < 0 for name, count in self.provider_node_counts.items())
+            or len(self.provider_node_counts) > 256
         ):
             raise ValueError("provider node counts are invalid")
-        if len(self.postprocess_latency_ms) < 10 or any(
+        if not 10 <= len(self.postprocess_latency_ms) <= 100_000 or any(
             not math.isfinite(value) or value < 0.0 for value in self.postprocess_latency_ms
         ):
             raise ValueError("postprocess latency samples are invalid")
-        if len(self.device_memory_bytes) < 10 or any(
+        if not 10 <= len(self.device_memory_bytes) <= 100_000 or any(
             value < 0 for value in self.device_memory_bytes
         ):
             raise ValueError("device memory samples are invalid")
@@ -117,7 +119,7 @@ class PredictionBundle(_Strict):
     @model_validator(mode="after")
     def validate_frames(self) -> PredictionBundle:
         tokens = [frame.frame_token for frame in self.frames]
-        if not tokens or len(tokens) != len(set(tokens)):
+        if not tokens or len(tokens) > 100_000 or len(tokens) != len(set(tokens)):
             raise ValueError("prediction frame tokens must be nonempty and unique")
         if len(self.fault_history) > 1:
             raise ValueError("V1 fault bundles allow exactly one derived transformation")

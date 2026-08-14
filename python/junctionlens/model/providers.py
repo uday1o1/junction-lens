@@ -13,6 +13,7 @@ import torch
 from junctionlens.model.profile import M0ModelProfile
 from junctionlens.model.spike import INPUT_NAMES, OUTPUT_NAMES
 from junctionlens.model.synthetic import make_micro_inputs
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_path
 
 
 class ProviderProbeError(RuntimeError):
@@ -39,7 +40,22 @@ def _profile_session(
         {name: value.numpy() for name, value in zip(INPUT_NAMES, inputs, strict=True)},
     )
     trace_path = Path(session.end_profiling())
-    events = cast(list[dict[str, Any]], json.loads(trace_path.read_text(encoding="utf-8")))
+    try:
+        raw_events = load_json_path(
+            trace_path,
+            "ONNX Runtime provider trace",
+            ParseLimits(
+                max_bytes=64 * 1024 * 1024,
+                max_depth=32,
+                max_nodes=2_000_000,
+                max_container_items=1_000_000,
+            ),
+        )
+    except ParseBoundaryError as error:
+        raise ProviderProbeError(str(error)) from error
+    if not isinstance(raw_events, list) or not all(isinstance(item, dict) for item in raw_events):
+        raise ProviderProbeError("ONNX Runtime provider trace must be an object array")
+    events = cast(list[dict[str, Any]], raw_events)
     provider_counts: Counter[str] = Counter()
     cpu_nodes: list[str] = []
     for event in events:

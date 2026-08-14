@@ -1,0 +1,51 @@
+schema_version: junctionlens.advisory-exceptions.v1
+exceptions:
+  - advisory_id: PYSEC-2026-1805
+    package: protobuf
+    version: 6.31.1
+    expires: "2026-11-14"
+    severity: high
+    rationale: >-
+      The advisory is confined to google.protobuf.json_format.ParseDict handling of nested Any
+      messages.
+      JunctionLens does not call json_format, ParseDict, or use protobuf Any.
+      Its JSON boundaries use the separately bounded strict parser, and its protobuf boundary uses
+      the generated binary SceneControlGraphEnvelope type with byte, object, string, and depth
+      limits.
+      Updating the Python runtime alone would violate the required exact protoc, generated-code,
+      C++ header, and libprotobuf release match, so the complete native pin will be reassessed at
+      expiry.
+    controls:
+      - tests/security/test_parser_limits.py
+      - cpp/contract/validation.cpp
+      - cpp/fuzz/contract_fuzz.cpp
+      - cpp/fuzz/contract_fuzz_smoke.cpp
+  - advisory_id: PYSEC-2025-194
+    package: torch
+    version: 2.11.0
+    expires: "2026-11-14"
+    severity: medium
+    rationale: >-
+      The current OSV record declares 2.6.0-NA as the last affected release, while pip-audit
+      inconsistently reports the finding against later releases and a nonexistent 2.13.0 fix.
+      JunctionLens does not call torch.jit.script, which is the only affected API identified by the
+      advisory.
+      This exception records the upstream metadata inconsistency instead of treating it as a clean
+      scan, and it expires for mandatory reassessment.
+    controls:
+      - tests/security/test_supply_chain.py
+      - python/junctionlens/model/export.py
+  - advisory_id: PYSEC-2026-3447
+    package: setuptools
+    version: 81.0.0
+    expires: "2026-11-14"
+    severity: medium
+    rationale: >-
+      PyTorch 2.11 constrains its transitive setuptools dependency below the fixed 83.0.0 release.
+      The advisory affects only creation of source distributions on Unicode-normalizing macOS file
+      systems through MANIFEST.in exclusion matching.
+      JunctionLens uses Hatchling as its build backend, never invokes setuptools FileList or builds
+      source distributions through setuptools, and does not accept source trees for packaging.
+    controls:
+      - pyproject.toml
+      - tests/security/test_supply_chain.py

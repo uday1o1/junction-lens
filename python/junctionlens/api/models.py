@@ -22,7 +22,14 @@ class ServiceConfig(StrictModel):
     web_root: Path | None = None
     max_artifact_bytes: int = Field(default=512 * 1024 * 1024, ge=1)
     max_image_bytes: int = Field(default=8 * 1024 * 1024, ge=1)
+    max_image_width: int = Field(default=16_384, ge=1)
+    max_image_height: int = Field(default=16_384, ge=1)
+    max_image_pixels: int = Field(default=64_000_000, ge=1)
     max_metric_table_bytes: int = Field(default=256 * 1024 * 1024, ge=1)
+    max_metric_rows: int = Field(default=5_000_000, ge=1)
+    max_metric_columns: int = Field(default=512, ge=1)
+    max_metric_value_depth: int = Field(default=32, ge=1)
+    max_metric_value_items: int = Field(default=100_000, ge=1)
 
 
 class PageInfo(StrictModel):

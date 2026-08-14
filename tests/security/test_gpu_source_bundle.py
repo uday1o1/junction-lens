@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 from scripts.gpu.source_bundle import (
     SourceBundleError,
+    _strict_json_object,
     create_bundle,
     verify_and_extract,
 )
@@ -86,3 +87,15 @@ def test_source_bundle_refuses_clobber(tmp_path: Path) -> None:
     target.mkdir()
     with pytest.raises(SourceBundleError, match="already exists"):
         verify_and_extract(archive, manifest, target)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b'{"schema_version":"one","schema_version":"two"}',
+        ('{"schema_version":' + "[" * 20 + "0" + "]" * 20 + "}").encode(),
+    ],
+)
+def test_source_manifest_rejects_adversarial_json_shape(payload: bytes) -> None:
+    with pytest.raises(SourceBundleError):
+        _strict_json_object(payload)

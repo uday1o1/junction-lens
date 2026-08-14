@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import os
 import shutil
@@ -14,10 +13,15 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-import yaml
 from platformdirs import user_cache_path
 
 from junctionlens.evaluator.payload import EvaluatorPayloadError, parse_payload_bytes
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object,
+    load_yaml_object_path,
+)
 
 
 class EvaluationError(RuntimeError):
@@ -32,8 +36,14 @@ def _docker() -> str:
 
 
 def load_evaluator_image_contract(root: Path) -> Mapping[str, Any]:
-    with (root / "containers/images.lock").open(encoding="utf-8") as source:
-        payload = yaml.safe_load(source)
+    try:
+        payload = load_yaml_object_path(
+            root / "containers/images.lock",
+            "container image lock",
+            ParseLimits(max_bytes=4 * 1024 * 1024, max_depth=24, max_nodes=100_000),
+        )
+    except ParseBoundaryError as error:
+        raise EvaluationError(str(error)) from error
     try:
         evaluator = payload["application_images"]["official_evaluator"]
     except (KeyError, TypeError) as error:
@@ -180,10 +190,19 @@ def validate_evaluator_output(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
     try:
-        value = json.loads(raw_output)
-    except json.JSONDecodeError as error:
+        value = load_json_object(
+            raw_output.encode(),
+            "official evaluator output",
+            ParseLimits(
+                max_bytes=128 * 1024 * 1024,
+                max_depth=32,
+                max_nodes=2_000_000,
+                max_container_items=1_000_000,
+            ),
+        )
+    except ParseBoundaryError as error:
         raise EvaluationError("official evaluator returned invalid JSON") from error
-    if not isinstance(value, dict) or set(value) != {
+    if set(value) != {
         "environment",
         "input_sha256",
         "matching",

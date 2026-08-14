@@ -25,10 +25,53 @@ LOCK_PATHS = (
     "uv.lock",
     "pnpm-lock.yaml",
 )
+MAX_MANIFEST_BYTES = 16 * 1024 * 1024
+MAX_MANIFEST_DEPTH = 16
+MAX_MANIFEST_NODES = 500_000
 
 
 class SourceBundleError(RuntimeError):
     """Raised when source synchronization cannot be proven safe."""
+
+
+def _strict_json_object(payload: bytes) -> dict[str, Any]:
+    if len(payload) > MAX_MANIFEST_BYTES:
+        raise SourceBundleError("source manifest exceeds the byte limit")
+
+    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in items:
+            if key in result:
+                raise SourceBundleError(f"source manifest repeats JSON key {key}")
+            result[key] = value
+        return result
+
+    try:
+        value = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=reject_duplicates,
+            parse_constant=lambda item: (_ for _ in ()).throw(
+                SourceBundleError(f"source manifest contains nonfinite value {item}")
+            ),
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
+        raise SourceBundleError("source manifest is not strict UTF-8 JSON") from error
+    if not isinstance(value, dict):
+        raise SourceBundleError("source manifest must be an object")
+    nodes = 0
+    stack: list[tuple[object, int]] = [(value, 1)]
+    while stack:
+        item, depth = stack.pop()
+        nodes += 1
+        if nodes > MAX_MANIFEST_NODES:
+            raise SourceBundleError("source manifest exceeds the node limit")
+        if depth > MAX_MANIFEST_DEPTH:
+            raise SourceBundleError("source manifest exceeds the depth limit")
+        if isinstance(item, dict):
+            stack.extend((child, depth + 1) for child in item.values())
+        elif isinstance(item, list):
+            stack.extend((child, depth + 1) for child in item)
+    return value
 
 
 def _run_git(root: Path, arguments: Sequence[str]) -> bytes:
@@ -213,10 +256,12 @@ def create_bundle(
 
 def _load_manifest(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        if path.is_symlink() or not path.is_file():
+            raise SourceBundleError("source manifest is not a regular file")
+        value = _strict_json_object(path.read_bytes())
+    except OSError as error:
         raise SourceBundleError("source manifest is unreadable") from error
-    if not isinstance(value, dict) or value.get("schema_version") != SCHEMA_VERSION:
+    if value.get("schema_version") != SCHEMA_VERSION:
         raise SourceBundleError("source manifest schema is invalid")
     content_sha256 = value.get("content_sha256")
     archive_sha256 = value.get("archive_sha256")

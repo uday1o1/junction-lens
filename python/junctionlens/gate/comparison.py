@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import tempfile
 from collections import defaultdict
@@ -18,6 +17,13 @@ from junctionlens.gate.charter import CharterCell, FrozenCharter, load_frozen_ch
 from junctionlens.gate.decision import GateEvidence, decide_release
 from junctionlens.registry.service import EvidenceRegistry
 from junctionlens.registry.store import RegistryError, canonical_json_bytes
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object,
+    load_yaml_object_path,
+    read_bounded_file,
+)
 
 _MAX_ARM_BYTES = 512 * 1024 * 1024
 _SHA256_LENGTH = 64
@@ -86,7 +92,7 @@ class RuntimeArm(_Strict):
             if not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"{label} must be finite and nonnegative")
         for metric, blocks in self.metrics.items():
-            if not metric or len(metric) > 128 or not blocks:
+            if not metric or len(metric) > 128 or not blocks or len(blocks) > 10_000:
                 raise ValueError("runtime metric identity and blocks must be nonempty")
             identifiers = [block.block_id for block in blocks]
             if len(identifiers) != len(set(identifiers)):
@@ -141,7 +147,7 @@ class ComparisonArm(_Strict):
         tokens = [frame.frame_token for frame in self.frames]
         if len(tokens) != len(set(tokens)):
             raise ValueError("comparison arm contains duplicate frame tokens")
-        if not self.frames:
+        if not self.frames or len(self.frames) > 100_000:
             raise ValueError("comparison arm must contain at least one frame")
         return self
 
@@ -184,27 +190,20 @@ def _finite_tree(value: object, label: str) -> None:
 
 
 def _strict_object(payload: bytes, label: str) -> Mapping[str, Any]:
-    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, value in items:
-            if key in result:
-                raise ComparisonError(f"{label} contains duplicate JSON key {key}")
-            result[key] = value
-        return result
-
     try:
-        value = json.loads(
+        return load_json_object(
             payload,
-            object_pairs_hook=reject_duplicates,
-            parse_constant=lambda item: (_ for _ in ()).throw(
-                ComparisonError(f"{label} contains nonfinite constant {item}")
+            label,
+            ParseLimits(
+                max_bytes=_MAX_ARM_BYTES,
+                max_depth=32,
+                max_nodes=2_000_000,
+                max_container_items=1_000_000,
+                max_string_bytes=8 * 1024 * 1024,
             ),
         )
-    except json.JSONDecodeError as error:
-        raise ComparisonError(f"{label} is invalid JSON") from error
-    if not isinstance(value, dict):
-        raise ComparisonError(f"{label} must be a JSON object")
-    return cast(Mapping[str, Any], value)
+    except ParseBoundaryError as error:
+        raise ComparisonError(str(error)) from error
 
 
 def _load_arm(registry: EvidenceRegistry, manifest_sha256: str, label: str) -> ComparisonArm:
@@ -219,7 +218,14 @@ def _load_arm(registry: EvidenceRegistry, manifest_sha256: str, label: str) -> C
         raise ComparisonError(f"{label} has an unsupported media type")
     if cast(int, payload["byte_size"]) > _MAX_ARM_BYTES:
         raise ComparisonError(f"{label} exceeds the comparison input byte limit")
-    raw = registry.store.object_path(cast(str, payload["sha256"])).read_bytes()
+    try:
+        raw = read_bounded_file(
+            registry.store.object_path(cast(str, payload["sha256"])),
+            label,
+            _MAX_ARM_BYTES,
+        )
+    except ParseBoundaryError as error:
+        raise ComparisonError(str(error)) from error
     try:
         arm = ComparisonArm.model_validate(_strict_object(raw, label))
     except ValueError as error:
@@ -245,13 +251,21 @@ def _file_sha256(path: Path) -> str:
 
 
 def _slice_ids(path: Path) -> set[str]:
-    import yaml
-
     try:
-        value = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as error:
-        raise ComparisonError(f"slice registry is invalid: {error}") from error
-    if not isinstance(value, dict) or not isinstance(value.get("slices"), list):
+        value = load_yaml_object_path(
+            path,
+            "slice registry",
+            ParseLimits(
+                max_bytes=4 * 1024 * 1024,
+                max_depth=16,
+                max_nodes=100_000,
+                max_container_items=10_000,
+                max_string_bytes=64 * 1024,
+            ),
+        )
+    except ParseBoundaryError as error:
+        raise ComparisonError(str(error)) from error
+    if not isinstance(value.get("slices"), list):
         raise ComparisonError("slice registry must contain a slices array")
     result: set[str] = set()
     for item in value["slices"]:

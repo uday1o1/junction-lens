@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import os
 import tempfile
@@ -13,11 +12,16 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, cast
 
-import yaml
-
 from junctionlens.data.contracts import AdaptedFrame
 from junctionlens.data.openlane import OpenLaneAdapter
 from junctionlens.registry.store import canonical_json_bytes
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object,
+    load_json_object_path,
+    load_yaml_object_path,
+)
 
 _SHA256_LENGTH = 64
 _MAX_SPLIT_MANIFEST_BYTES = 4 * 1024 * 1024
@@ -154,11 +158,14 @@ def _strings(value: object, label: str) -> tuple[str, ...]:
 def load_split_policy(path: Path) -> SplitPolicy:
     """Load a strict policy that cannot admit result-derived assignment fields."""
     try:
-        with path.open(encoding="utf-8") as source:
-            value = yaml.safe_load(source)
-    except yaml.YAMLError as error:
-        raise ManifestError(f"invalid split policy YAML: {error}") from error
-    if not isinstance(value, dict) or set(value) != _POLICY_KEYS:
+        value = load_yaml_object_path(
+            path,
+            "split policy",
+            ParseLimits(max_bytes=1024 * 1024, max_depth=16, max_nodes=10_000),
+        )
+    except ParseBoundaryError as error:
+        raise ManifestError(str(error)) from error
+    if set(value) != _POLICY_KEYS:
         raise ManifestError("split policy has invalid top-level keys")
     if value["schema_version"] != "junctionlens.openlane-split-policy.v1":
         raise ManifestError("split policy schema is unsupported")
@@ -439,10 +446,20 @@ def verify_frame_records(path: Path, metadata: Mapping[str, Any]) -> None:
             if len(line) > _MAX_FRAME_RECORD_BYTES or not line.endswith(b"\n"):
                 raise ManifestError("frame-record payload has an oversized or incomplete line")
             try:
-                value = json.loads(line)
-            except json.JSONDecodeError as error:
+                value = load_json_object(
+                    line,
+                    "frame record",
+                    ParseLimits(
+                        max_bytes=_MAX_FRAME_RECORD_BYTES,
+                        max_depth=8,
+                        max_nodes=128,
+                        max_container_items=32,
+                        max_string_bytes=4096,
+                    ),
+                )
+            except ParseBoundaryError as error:
                 raise ManifestError("frame-record payload contains invalid JSON") from error
-            if not isinstance(value, dict) or set(value) != _FRAME_RECORD_KEYS:
+            if set(value) != _FRAME_RECORD_KEYS:
                 raise ManifestError("frame-record payload has invalid fields")
             split_id = value["split_id"]
             segment_id = value["segment_id"]
@@ -730,17 +747,19 @@ def audit_split_manifest(
 
 def load_split_manifest(path: Path) -> Mapping[str, Any]:
     """Load one bounded JSON split artifact for independent audit."""
-    if path.is_symlink() or not path.is_file():
-        raise ManifestError("split manifest must be a regular file")
-    if path.stat().st_size > _MAX_SPLIT_MANIFEST_BYTES:
-        raise ManifestError("split manifest exceeds the byte limit")
     try:
-        value = json.loads(path.read_bytes())
-    except json.JSONDecodeError as error:
-        raise ManifestError("split manifest contains invalid JSON") from error
-    if not isinstance(value, dict):
-        raise ManifestError("split manifest must be an object")
-    return cast(Mapping[str, Any], value)
+        return load_json_object_path(
+            path,
+            "split manifest",
+            ParseLimits(
+                max_bytes=_MAX_SPLIT_MANIFEST_BYTES,
+                max_depth=24,
+                max_nodes=2_000_000,
+                max_container_items=1_000_000,
+            ),
+        )
+    except ParseBoundaryError as error:
+        raise ManifestError(str(error)) from error
 
 
 def write_immutable_split_manifest(path: Path, manifest: Mapping[str, Any]) -> str:

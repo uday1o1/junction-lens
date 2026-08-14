@@ -16,12 +16,17 @@ from junctionlens.contract import (
     to_binary,
     to_json,
 )
+from junctionlens.contract.limits import MAX_SERIALIZED_BYTES
+from junctionlens.security.parsing import ParseBoundaryError, read_bounded_file
 
 contract_app = typer.Typer(help="Validate and convert SceneControlGraph V1 artifacts.")
 
 
 def _parse(path: Path, encoding: str):  # type: ignore[no-untyped-def]
-    payload = path.read_bytes()
+    try:
+        payload = read_bounded_file(path, "contract input", MAX_SERIALIZED_BYTES)
+    except ParseBoundaryError as error:
+        raise ContractViolation("CONTRACT_IO", encoding, error.detail) from error
     if encoding == "binary":
         return parse_binary(payload)
     return parse_json(payload)

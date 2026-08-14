@@ -15,9 +15,11 @@ Repository commands:
   bootstrap-cpu
   configure-cpu
   configure-sanitizers
+  configure-fuzz
   configure-gpu
   build-cpu
   build-sanitizers
+  build-fuzz
   build-gpu
   doctor
   format-cpp-check
@@ -26,6 +28,7 @@ Repository commands:
   typecheck
   test-cpp
   test-sanitizers
+  test-fuzz
   test-python
   test-contract
   generate-bindings
@@ -50,6 +53,10 @@ Repository commands:
   test-integration-app
   test-integration-report
   test-web
+  scan-dependencies
+  generate-sbom
+  test-security
+  test-reproducibility
   build-evaluator [--check-lock]
   test-evaluator
   verify-locks [--online]
@@ -84,6 +91,7 @@ Repository commands:
   verify-m9-1
   verify-m9-2
   verify-m9-3
+  verify-m10-1
 EOF
 }
 
@@ -105,6 +113,9 @@ case "$JL_COMMAND" in
   configure-sanitizers)
     cmake --preset sanitizers "$@"
     ;;
+  configure-fuzz)
+    cmake --preset fuzz "$@"
+    ;;
   configure-gpu)
     cmake --preset gpu "$@"
     ;;
@@ -113,6 +124,9 @@ case "$JL_COMMAND" in
     ;;
   build-sanitizers)
     cmake --build --preset sanitizers "$@"
+    ;;
+  build-fuzz)
+    cmake --build --preset fuzz "$@"
     ;;
   build-gpu)
     cmake --build --preset gpu "$@"
@@ -152,6 +166,14 @@ case "$JL_COMMAND" in
     ;;
   test-sanitizers)
     ctest --preset sanitizers "$@"
+    ;;
+  test-fuzz)
+    "$JL_ROOT/build/fuzz/junctionlens-contract-fuzz-smoke" \
+      --input "$JL_ROOT/tests/fixtures/contract/v1/golden.pb" \
+      --runs 5000 \
+      --seed 20260814 \
+      --max-length 1048576 \
+      "$@"
     ;;
   test-python)
     uv run --locked pytest "$@"
@@ -299,6 +321,45 @@ case "$JL_COMMAND" in
     pnpm run test:web:unit
     pnpm run build:web
     pnpm run test:web:browser
+    ;;
+  scan-dependencies)
+    mkdir -p "$JL_ROOT/artifacts/security"
+    uv run --locked python "$JL_ROOT/scripts/security/supply_chain.py" audit \
+      --output "$JL_ROOT/artifacts/security/dependency-audit.json" "$@"
+    ;;
+  generate-sbom)
+    mkdir -p "$JL_ROOT/artifacts/security"
+    uv run --locked python "$JL_ROOT/scripts/security/supply_chain.py" sbom \
+      --output "$JL_ROOT/artifacts/security/sbom.cdx.json" "$@"
+    ;;
+  test-security)
+    mkdir -p "$JL_ROOT/artifacts/security"
+    uv run --locked pytest \
+      "$JL_ROOT/tests/security" \
+      "$JL_ROOT/tests/unit/test_api_repository.py" \
+      "$JL_ROOT/tests/integration/test_app_cli_api.py" \
+      "$@"
+    "$0" configure-fuzz
+    "$0" build-fuzz
+    "$0" test-fuzz
+    uv run --locked python "$JL_ROOT/scripts/security/supply_chain.py" all-local \
+      --output "$JL_ROOT/artifacts/security/local-security.json" >/dev/null
+    "$0" scan-dependencies >/dev/null
+    "$0" generate-sbom >/dev/null
+    ;;
+  test-reproducibility)
+    JL_REPRO_TMP=$(mktemp -d "${TMPDIR:-/tmp}/junctionlens-repro.XXXXXX")
+    trap 'rm -rf "$JL_REPRO_TMP"' EXIT HUP INT TERM
+    uv run --locked python "$JL_ROOT/scripts/security/supply_chain.py" sbom \
+      --output "$JL_REPRO_TMP/first.cdx.json" >/dev/null
+    uv run --locked python "$JL_ROOT/scripts/security/supply_chain.py" sbom \
+      --output "$JL_REPRO_TMP/second.cdx.json" >/dev/null
+    cmp "$JL_REPRO_TMP/first.cdx.json" "$JL_REPRO_TMP/second.cdx.json"
+    uv run --locked pytest \
+      "$JL_ROOT/tests/security/test_gpu_source_bundle.py" \
+      "$JL_ROOT/tests/security/test_supply_chain.py" \
+      "$JL_ROOT/tests/integration/test_report_cli.py" \
+      "$@"
     ;;
   build-evaluator)
     uv run --locked python scripts/containers/build_evaluator.py "$@"
@@ -465,6 +526,11 @@ case "$JL_COMMAND" in
   verify-m9-3)
     "$0" verify-m9-2
     "$0" test-integration-report
+    ;;
+  verify-m10-1)
+    "$0" verify-m9-3
+    "$0" test-security
+    "$0" test-reproducibility
     ;;
   -h|--help|help)
     usage

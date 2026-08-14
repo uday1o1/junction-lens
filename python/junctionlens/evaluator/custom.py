@@ -15,13 +15,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-import yaml
 from platformdirs import user_cache_path
 
 from junctionlens.contract import canonical_logical_sha256, parse_binary
 from junctionlens.geometry import resample_polyline
 from junctionlens.registry import ContentAddressedStore
 from junctionlens.registry.store import canonical_json_bytes
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object,
+    load_yaml_object,
+    read_bounded_file,
+)
 from junctionlens.v1 import scene_control_graph_pb2 as scg
 
 from .official import (
@@ -246,10 +252,19 @@ def validate_custom_match_output(
 ) -> dict[str, Any]:
     """Validate all association decisions against the trusted mounted request."""
     try:
-        value = json.loads(raw_output)
-    except json.JSONDecodeError as error:
+        value = load_json_object(
+            raw_output.encode(),
+            "CustomMatchV1 output",
+            ParseLimits(
+                max_bytes=64 * 1024 * 1024,
+                max_depth=32,
+                max_nodes=2_000_000,
+                max_container_items=1_000_000,
+            ),
+        )
+    except ParseBoundaryError as error:
         raise EvaluationError("CustomMatchV1 returned invalid JSON") from error
-    if not isinstance(value, dict) or set(value) != {
+    if set(value) != {
         "frames",
         "input_sha256",
         "policy",
@@ -1083,9 +1098,16 @@ def compute_custom_metrics(
 
 def _metric_contract(root: Path) -> tuple[Mapping[str, Any], str]:
     path = root / "configs/metrics/v1.yaml"
-    raw = path.read_bytes()
-    payload = yaml.safe_load(raw)
-    if not isinstance(payload, dict) or payload.get("schema_version") != "junctionlens.metrics.v1":
+    try:
+        raw = read_bounded_file(path, "metric registry", 4 * 1024 * 1024)
+        payload = load_yaml_object(
+            raw,
+            "metric registry",
+            ParseLimits(max_bytes=4 * 1024 * 1024, max_depth=24, max_nodes=100_000),
+        )
+    except ParseBoundaryError as error:
+        raise EvaluationError(str(error)) from error
+    if payload.get("schema_version") != "junctionlens.metrics.v1":
         raise EvaluationError("metric registry is invalid")
     metrics = payload.get("metrics")
     if not isinstance(metrics, dict):

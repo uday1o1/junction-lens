@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 from fastapi.testclient import TestClient
+from PIL import Image
 from typer.testing import CliRunner
 
 from junctionlens.api import ServiceConfig, create_app
@@ -71,8 +73,10 @@ def _registered_evidence(
         metadata={"row_count": 2},
         parents=(decision_receipt.manifest_sha256,),
     )
+    image_buffer = BytesIO()
+    Image.new("RGB", (32, 24), color=(20, 30, 40)).save(image_buffer, format="PNG")
     image_receipt = registry.put_bytes(
-        b"\x89PNG\r\n\x1a\nsynthetic",
+        image_buffer.getvalue(),
         kind="evidence_report",
         media_type="image/png",
         license_id="CC0-1.0",
@@ -116,6 +120,8 @@ def test_read_only_api_serves_paginated_registered_evidence(tmp_path: Path) -> N
     assert "script-src 'self'" in policy
     assert "object-src 'none'" in policy
     assert "frame-ancestors 'none'" in policy
+    assert health.headers["permissions-policy"].startswith("camera=()")
+    assert health.headers["cross-origin-resource-policy"] == "same-origin"
 
     first_page = client.get("/api/v1/artifacts", params={"limit": 2})
     second_page = client.get("/api/v1/artifacts", params={"limit": 2, "offset": 2})
@@ -148,6 +154,58 @@ def test_read_only_api_serves_paginated_registered_evidence(tmp_path: Path) -> N
     assert image.status_code == 200
     assert image.content.startswith(b"\x89PNG")
     assert image.headers["x-junctionlens-license"] == "CC0-1.0"
+
+
+def test_image_route_rejects_declared_png_with_malformed_bytes(tmp_path: Path) -> None:
+    artifact_root, _, _, _, _ = _registered_evidence(tmp_path)
+    registry = EvidenceRegistry(artifact_root, SCHEMA)
+    malformed = registry.put_bytes(
+        b"\x89PNG\r\n\x1a\nnot-a-raster",
+        kind="evidence_report",
+        media_type="image/png",
+        license_id="CC0-1.0",
+        metadata={"seeded_defect": "malformed-image"},
+    )
+    client = TestClient(
+        create_app(ServiceConfig(artifact_root=artifact_root, schema_path=SCHEMA)),
+        base_url="http://127.0.0.1",
+    )
+
+    response = client.get(f"/api/v1/images/{malformed.manifest_sha256}")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "API_REGISTRY_INVALID"
+    assert "malformed" in response.json()["error"]["message"]
+
+
+def test_metric_route_rejects_malformed_parquet_and_excess_rows(tmp_path: Path) -> None:
+    artifact_root, _, metric_receipt, _, _ = _registered_evidence(tmp_path)
+    registry = EvidenceRegistry(artifact_root, SCHEMA)
+    malformed = registry.put_bytes(
+        b"not parquet",
+        kind="comparison",
+        media_type="application/vnd.apache.parquet",
+        license_id="Apache-2.0",
+        metadata={"seeded_defect": "malformed-parquet"},
+    )
+    client = TestClient(
+        create_app(
+            ServiceConfig(
+                artifact_root=artifact_root,
+                schema_path=SCHEMA,
+                max_metric_rows=1,
+            )
+        ),
+        base_url="http://127.0.0.1",
+    )
+
+    malformed_response = client.get(f"/api/v1/metrics/{malformed.manifest_sha256}")
+    oversized_response = client.get(f"/api/v1/metrics/{metric_receipt.manifest_sha256}")
+
+    assert malformed_response.status_code == 409
+    assert malformed_response.json()["error"]["code"] == "API_REGISTRY_INVALID"
+    assert oversized_response.status_code == 409
+    assert "row limit" in oversized_response.json()["error"]["message"]
 
 
 def test_api_errors_are_stable_and_all_routes_are_read_only(tmp_path: Path) -> None:
@@ -387,3 +445,34 @@ def test_every_documented_public_command_has_help() -> None:
     for command in commands:
         result = runner.invoke(app, [*command, "--help"])
         assert result.exit_code == 0, f"{' '.join(command)}: {result.output}"
+
+
+def test_service_cli_redacts_diagnostic_roots_and_credentials(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    artifact_root, _, _, _, _ = _registered_evidence(tmp_path)
+    secret = "access_token=" + "seeded-private-value"
+
+    def fail_check(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError(f"root={artifact_root} {secret}")
+
+    monkeypatch.setattr("junctionlens.api.server.check_service", fail_check)
+    result = CliRunner().invoke(
+        app,
+        [
+            "serve",
+            "--artifact-root",
+            str(artifact_root),
+            "--schema",
+            str(SCHEMA),
+            "--api-only",
+            "--check",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert str(artifact_root) not in result.stderr
+    assert "seeded-private-value" not in result.stderr
+    assert "[LOCAL_ROOT]" in result.stderr
+    assert "[REDACTED]" in result.stderr

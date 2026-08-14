@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-import json
 import math
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object_path,
+)
 
 NLL_EPSILON = 1.0e-7
 MAX_INPUT_BYTES = 16 * 1024 * 1024
@@ -286,32 +291,20 @@ def runtime_distributions(samples: list[dict[str, Any]], *, clock_source: str) -
 
 
 def _strict_json(path: Path) -> dict[str, Any]:
-    with path.open("rb") as source:
-        raw = source.read(MAX_INPUT_BYTES + 1)
-    if len(raw) > MAX_INPUT_BYTES:
-        raise EvidenceError("evidence input exceeds the byte limit")
-
-    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result = {}
-        for key, value in items:
-            if key in result:
-                raise EvidenceError(f"duplicate JSON object key: {key}")
-            result[key] = value
-        return result
-
     try:
-        value = json.loads(
-            raw,
-            object_pairs_hook=pairs,
-            parse_constant=lambda item: (_ for _ in ()).throw(
-                EvidenceError(f"nonfinite JSON constant {item}")
+        return load_json_object_path(
+            path,
+            "evidence input",
+            ParseLimits(
+                max_bytes=MAX_INPUT_BYTES,
+                max_depth=32,
+                max_nodes=1_000_000,
+                max_container_items=MAX_OBSERVATIONS,
+                max_string_bytes=1024 * 1024,
             ),
         )
-    except json.JSONDecodeError as error:
-        raise EvidenceError(f"evidence input is invalid JSON: {error}") from error
-    if not isinstance(value, dict):
-        raise EvidenceError("evidence input must be an object")
-    return value
+    except ParseBoundaryError as error:
+        raise EvidenceError(str(error)) from error
 
 
 def evaluate_calibration_file(path: Path) -> dict[str, Any]:

@@ -6,12 +6,12 @@ import hashlib
 import json
 import math
 from collections.abc import Iterator, Mapping, Sequence
+from io import BytesIO
 from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
 import numpy.typing as npt
-import yaml
 from PIL import Image
 
 from junctionlens.data.contracts import (
@@ -40,8 +40,17 @@ from junctionlens.data.geometry import (
     openlane_points_to_junctionlens,
     openlane_pose_to_junctionlens_world,
 )
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object,
+    load_json_object_path,
+    load_yaml_object_path,
+    read_bounded_file,
+)
 
 _MAX_METADATA_BYTES = 16 * 1024 * 1024
+_MAX_IMAGE_BYTES = 64 * 1024 * 1024
 _IDENTITY_3 = np.eye(3, dtype=np.float64)
 _IDENTITY_4 = np.eye(4, dtype=np.float64)
 _ALLOWED_BOUNDARY_TYPES = frozenset({0, 1, 2})
@@ -165,9 +174,14 @@ class OpenLaneAdapter:
 
     def __init__(self, root: Path, config_path: Path) -> None:
         self.root = root.expanduser().resolve(strict=True)
-        with config_path.open(encoding="utf-8") as source:
-            raw_config = yaml.safe_load(source)
-        self.config = _as_mapping(raw_config, "adapter config")
+        try:
+            self.config = load_yaml_object_path(
+                config_path,
+                "adapter config",
+                ParseLimits(max_bytes=1024 * 1024, max_depth=16, max_nodes=10_000),
+            )
+        except ParseBoundaryError as error:
+            raise OpenLaneAdapterError(str(error)) from error
         self.adapter_version = str(self.config["adapter_version"])
         self.schema_mode = str(self.config["schema_mode"])
         if self.schema_mode != "lane-segment-v2.1":
@@ -265,20 +279,33 @@ class OpenLaneAdapter:
 
     def load_frame(self, split_id: str, segment_id: str, timestamp: str) -> AdaptedFrame:
         """Load and validate one raw lane-segment metadata frame."""
-        info_root = self._safe_path(Path(split_id) / segment_id / "info", require_file=False)
-        lane_segment_path = info_root / f"{timestamp}-ls.json"
-        if not lane_segment_path.is_file():
-            raise OpenLaneAdapterError(
-                f"missing lane-segment metadata {lane_segment_path}; install the Map Element Bucket"
-            )
-        raw_bytes = lane_segment_path.read_bytes()
-        if len(raw_bytes) > _MAX_METADATA_BYTES:
-            raise OpenLaneAdapterError(f"metadata file exceeds {_MAX_METADATA_BYTES} bytes")
         try:
-            raw_value = json.loads(raw_bytes)
-        except json.JSONDecodeError as error:
-            raise OpenLaneAdapterError(f"invalid JSON in {lane_segment_path}: {error}") from error
-        metadata = _as_mapping(raw_value, "frame metadata")
+            lane_segment_path = self._safe_path(
+                Path(split_id) / segment_id / "info" / f"{timestamp}-ls.json"
+            )
+        except (OSError, OpenLaneAdapterError) as error:
+            raise OpenLaneAdapterError(
+                "missing or unsafe lane-segment metadata; install the Map Element Bucket"
+            ) from error
+        try:
+            raw_bytes = read_bounded_file(
+                lane_segment_path,
+                "frame metadata",
+                _MAX_METADATA_BYTES,
+            )
+            metadata = load_json_object(
+                raw_bytes,
+                "frame metadata",
+                ParseLimits(
+                    max_bytes=_MAX_METADATA_BYTES,
+                    max_depth=32,
+                    max_nodes=1_000_000,
+                    max_container_items=100_000,
+                    max_string_bytes=4 * 1024 * 1024,
+                ),
+            )
+        except ParseBoundaryError as error:
+            raise OpenLaneAdapterError(str(error)) from error
         metadata_version = str(_required(metadata, "version", "frame metadata"))
         if not metadata_version or len(metadata_version) > 64:
             raise OpenLaneAdapterError("OpenLane metadata version must be a short nonempty string")
@@ -345,7 +372,12 @@ class OpenLaneAdapter:
             raise OpenLaneAdapterError(f"camera slot {camera.slot.value} has no source image")
         image_path = self._safe_path(Path(camera.image_relative_path))
         try:
-            with Image.open(image_path) as source:
+            image_bytes = read_bounded_file(
+                image_path,
+                f"camera image {camera.slot.value}",
+                _MAX_IMAGE_BYTES,
+            )
+            with Image.open(BytesIO(image_bytes)) as source:
                 source.load()
                 if source.size != (camera.original_width, camera.original_height):
                     raise OpenLaneAdapterError(
@@ -354,7 +386,7 @@ class OpenLaneAdapter:
                         f"observed {source.width}x{source.height}"
                     )
                 rgb = np.asarray(source.convert("RGB"), dtype=np.uint8).copy()
-        except (Image.DecompressionBombError, OSError) as error:
+        except (Image.DecompressionBombError, OSError, ParseBoundaryError) as error:
             raise OpenLaneAdapterError(
                 f"cannot decode camera image {camera.image_relative_path}: {error}"
             ) from error
@@ -412,14 +444,20 @@ class OpenLaneAdapter:
 
     def _load_json(self, path: Path, label: str) -> Mapping[str, Any]:
         safe_path = self._safe_path(path.relative_to(self.root))
-        if safe_path.stat().st_size > _MAX_METADATA_BYTES:
-            raise OpenLaneAdapterError(f"{label} exceeds {_MAX_METADATA_BYTES} bytes")
         try:
-            with safe_path.open(encoding="utf-8") as source:
-                value = json.load(source)
-        except json.JSONDecodeError as error:
-            raise OpenLaneAdapterError(f"invalid {label}: {error}") from error
-        return _as_mapping(value, label)
+            return load_json_object_path(
+                safe_path,
+                label,
+                ParseLimits(
+                    max_bytes=_MAX_METADATA_BYTES,
+                    max_depth=32,
+                    max_nodes=2_000_000,
+                    max_container_items=1_000_000,
+                    max_string_bytes=4 * 1024 * 1024,
+                ),
+            )
+        except ParseBoundaryError as error:
+            raise OpenLaneAdapterError(str(error)) from error
 
     def _safe_path(self, relative: Path, *, require_file: bool = True) -> Path:
         if relative.is_absolute() or ".." in relative.parts:

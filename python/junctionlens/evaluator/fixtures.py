@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import copy
-import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
-import yaml
-
 from junctionlens.evaluator.payload import validate_payload
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object_path,
+    load_yaml_object_path,
+)
 
 
 class FixtureError(ValueError):
@@ -183,17 +186,34 @@ def _apply_transform(payload: dict[str, Any], transform: object) -> None:
 
 def load_cases(fixtures_root: Path) -> Mapping[str, Mapping[str, Any]]:
     """Load and validate the declarative fixed case set."""
-    with (fixtures_root / "cases.yaml").open(encoding="utf-8") as source:
-        manifest = yaml.safe_load(source)
-    if not isinstance(manifest, dict) or set(manifest) != {"base", "cases", "schema_version"}:
+    try:
+        manifest = load_yaml_object_path(
+            fixtures_root / "cases.yaml",
+            "evaluator fixture manifest",
+            ParseLimits(max_bytes=1024 * 1024, max_depth=24, max_nodes=100_000),
+        )
+    except ParseBoundaryError as error:
+        raise FixtureError(str(error)) from error
+    if set(manifest) != {"base", "cases", "schema_version"}:
         raise FixtureError("fixture manifest has invalid top-level keys")
     if manifest["schema_version"] != "junctionlens.official-evaluator-cases.v1":
         raise FixtureError("fixture manifest schema is unsupported")
     base_name = manifest["base"]
     if not isinstance(base_name, str) or Path(base_name).name != base_name:
         raise FixtureError("fixture base must be one local filename")
-    with (fixtures_root / base_name).open(encoding="utf-8") as source:
-        base = json.load(source)
+    try:
+        base = load_json_object_path(
+            fixtures_root / base_name,
+            "evaluator fixture base",
+            ParseLimits(
+                max_bytes=16 * 1024 * 1024,
+                max_depth=32,
+                max_nodes=1_000_000,
+                max_container_items=100_000,
+            ),
+        )
+    except ParseBoundaryError as error:
+        raise FixtureError(str(error)) from error
     validate_payload(base)
     raw_cases = manifest["cases"]
     if not isinstance(raw_cases, dict) or not raw_cases:

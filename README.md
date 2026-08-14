@@ -34,6 +34,7 @@ See [Remote GPU qualification](docs/gpu-qualification.md) for secure source sync
 See [Local evidence service](docs/local-evidence-service.md) for the loopback-only read API and production browser workflow.
 See [Scene viewer](docs/scene-viewer.md) for synchronized camera and graph regression inspection.
 See [Reproducible evidence reports](docs/evidence-reports.md) for deterministic public and acknowledged private offline bundles.
+See [Supply-chain security](docs/supply-chain-security.md) for parser hardening, vulnerability policy, secret scanning, license inventory, and deterministic SBOM commands.
 
 See [E1 learned topology](docs/e1-learned-topology.md) for the directed edge heads, canonical matrix ordering, topology objective, and oracle-node versus predicted-node diagnostics.
 

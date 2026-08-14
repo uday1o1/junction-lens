@@ -153,3 +153,20 @@ def test_official_wrapper_rejects_seeded_matching_artifact_corruption(
         validate_evaluator_output(
             json.dumps(output), hashlib.sha256(source).hexdigest(), source_payload
         )
+
+
+@pytest.mark.parametrize(
+    "raw_output",
+    [
+        '{"schema_version":"one","schema_version":"two"}',
+        '{"schema_version":' + "[" * 40 + "0" + "]" * 40 + "}",
+    ],
+)
+def test_official_wrapper_rejects_adversarial_json_shape(raw_output: str) -> None:
+    source = Path("tests/fixtures/evaluator/perfect.json").read_bytes()
+    with pytest.raises(EvaluationError, match="invalid JSON"):
+        validate_evaluator_output(
+            raw_output,
+            hashlib.sha256(source).hexdigest(),
+            json.loads(source),
+        )

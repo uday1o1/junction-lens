@@ -163,3 +163,20 @@ def test_custom_match_output_rejects_seeded_integrity_defects(defect: str) -> No
             request,
             hashlib.sha256(canonical_json_bytes(request)).hexdigest(),
         )
+
+
+@pytest.mark.parametrize(
+    "raw_output",
+    [
+        '{"schema_version":"one","schema_version":"two"}',
+        '{"schema_version":' + "[" * 40 + "0" + "]" * 40 + "}",
+    ],
+)
+def test_custom_match_output_rejects_adversarial_json_shape(raw_output: str) -> None:
+    request = _request()
+    with pytest.raises(EvaluationError, match="invalid JSON"):
+        validate_custom_match_output(
+            raw_output,
+            request,
+            hashlib.sha256(canonical_json_bytes(request)).hexdigest(),
+        )

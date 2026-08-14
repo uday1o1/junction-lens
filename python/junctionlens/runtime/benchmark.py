@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-import json
 import math
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal, cast
 
-import yaml
 from pydantic import BaseModel, ConfigDict, Field
+
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object_path,
+    load_yaml_object_path,
+)
 
 
 class BenchmarkEvidenceError(RuntimeError):
@@ -118,36 +123,38 @@ _MONITOR_KEYS = {
 
 
 def _strict_json(path: Path, *, maximum_bytes: int = 64 * 1024 * 1024) -> dict[str, Any]:
-    raw = path.read_bytes()
-    if not raw or len(raw) > maximum_bytes:
-        raise BenchmarkEvidenceError("benchmark evidence is empty or exceeds 64 MiB")
-
-    def object_pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, value in items:
-            if key in result:
-                raise BenchmarkEvidenceError(f"duplicate JSON key: {key}")
-            result[key] = value
-        return result
-
     try:
-        value = json.loads(
-            raw,
-            object_pairs_hook=object_pairs,
-            parse_constant=lambda token: (_ for _ in ()).throw(
-                BenchmarkEvidenceError(f"nonfinite JSON token: {token}")
+        return load_json_object_path(
+            path,
+            "benchmark evidence",
+            ParseLimits(
+                max_bytes=maximum_bytes,
+                max_depth=32,
+                max_nodes=2_000_000,
+                max_container_items=1_000_000,
+                max_string_bytes=4 * 1024 * 1024,
             ),
         )
-    except json.JSONDecodeError as error:
-        raise BenchmarkEvidenceError("benchmark evidence is not valid JSON") from error
-    if not isinstance(value, dict):
-        raise BenchmarkEvidenceError("benchmark evidence root must be an object")
-    return cast(dict[str, Any], value)
+    except ParseBoundaryError as error:
+        raise BenchmarkEvidenceError(str(error)) from error
 
 
 def load_runtime_qualification(path: Path) -> RuntimeQualificationConfig:
     """Load the exact runtime protocol with unknown-key rejection."""
-    value = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        value = load_yaml_object_path(
+            path,
+            "runtime qualification config",
+            ParseLimits(
+                max_bytes=1024 * 1024,
+                max_depth=16,
+                max_nodes=10_000,
+                max_container_items=1_000,
+                max_string_bytes=64 * 1024,
+            ),
+        )
+    except ParseBoundaryError as error:
+        raise BenchmarkEvidenceError(str(error)) from error
     result = RuntimeQualificationConfig.model_validate(value)
     if result.protocol.memory_sample_period > result.protocol.stability_frames:
         raise BenchmarkEvidenceError("memory sample period exceeds the stability run")

@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.31)
 project(JunctionLens VERSION 0.1.0 LANGUAGES CXX)
 
 option(JUNCTIONLENS_ENABLE_CUDA_RUNTIME "Enable the isolated CUDA runtime artifact" OFF)
+option(JUNCTIONLENS_ENABLE_FUZZING "Build the bounded parser mutation smoke target" OFF)
+option(JUNCTIONLENS_ENABLE_LIBFUZZER "Build the optional Clang libFuzzer target" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -59,9 +61,11 @@ add_library(junctionlens_contract STATIC cpp/contract/validation.cpp)
 add_library(junctionlens::contract ALIAS junctionlens_contract)
 target_include_directories(junctionlens_contract PUBLIC "${PROJECT_SOURCE_DIR}/cpp")
 target_link_libraries(junctionlens_contract PUBLIC junctionlens_contract_proto)
+junctionlens_enable_sanitizers(junctionlens_contract)
 
 add_executable(junctionlens-contract-probe cpp/contract/probe.cpp)
 target_link_libraries(junctionlens-contract-probe PRIVATE junctionlens::contract)
+junctionlens_enable_sanitizers(junctionlens-contract-probe)
 set_target_properties(
   junctionlens-contract-probe
   PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}"
@@ -77,6 +81,36 @@ add_library(junctionlens_eval STATIC cpp/src/eval/metrics.cpp)
 add_library(junctionlens::eval ALIAS junctionlens_eval)
 target_include_directories(junctionlens_eval PUBLIC "${PROJECT_SOURCE_DIR}/cpp/include")
 junctionlens_enable_sanitizers(junctionlens_eval)
+
+if(JUNCTIONLENS_ENABLE_FUZZING)
+  add_executable(junctionlens-contract-fuzz-smoke cpp/fuzz/contract_fuzz_smoke.cpp)
+  target_link_libraries(junctionlens-contract-fuzz-smoke PRIVATE junctionlens::contract)
+  junctionlens_enable_sanitizers(junctionlens-contract-fuzz-smoke)
+  set_target_properties(
+    junctionlens-contract-fuzz-smoke
+    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}"
+  )
+endif()
+
+if(JUNCTIONLENS_ENABLE_LIBFUZZER)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "The optional libFuzzer target requires Clang")
+  endif()
+  add_executable(junctionlens-contract-fuzz cpp/fuzz/contract_fuzz.cpp)
+  target_link_libraries(junctionlens-contract-fuzz PRIVATE junctionlens::contract)
+  target_compile_options(
+    junctionlens-contract-fuzz
+    PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer
+  )
+  target_link_options(
+    junctionlens-contract-fuzz
+    PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer
+  )
+  set_target_properties(
+    junctionlens-contract-fuzz
+    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}"
+  )
+endif()
 
 if(NOT TARGET onnxruntime::onnxruntime)
   message(
@@ -198,12 +232,24 @@ else()
   target_compile_options(junctionlens-runtime PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   target_compile_options(junctionlens_contract PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   target_compile_options(junctionlens-contract-probe PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
+  if(JUNCTIONLENS_ENABLE_FUZZING)
+    target_compile_options(
+      junctionlens-contract-fuzz-smoke
+      PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS}
+    )
+  endif()
   target_compile_options(junctionlens_geometry PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   target_compile_options(junctionlens_eval PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   if(APPLE)
     set(JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS -Wno-gcc-compat -Wno-nullability-extension)
     target_compile_options(junctionlens_contract PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS})
     target_compile_options(junctionlens-contract-probe PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS})
+    if(JUNCTIONLENS_ENABLE_FUZZING)
+      target_compile_options(
+        junctionlens-contract-fuzz-smoke
+        PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS}
+      )
+    endif()
     target_compile_options(junctionlens_infer PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS})
     target_compile_options(junctionlens-runtime PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS})
   endif()

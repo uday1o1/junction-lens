@@ -68,6 +68,15 @@ def test_registry_rejects_symlink_root(tmp_path: Path) -> None:
         ContentAddressedStore(link, _SCHEMA)
 
 
+def test_registry_rejects_symlink_schema(tmp_path: Path) -> None:
+    """Schema validation reads an ordinary bounded file without following a symlink."""
+    schema_alias = tmp_path / "schema.json"
+    schema_alias.symlink_to(_SCHEMA.resolve())
+
+    with pytest.raises(RegistryError, match="cannot be read safely"):
+        ContentAddressedStore(tmp_path / "artifacts", schema_alias)
+
+
 def test_registry_rejects_nested_object_symlink(tmp_path: Path) -> None:
     """A nested object directory cannot redirect immutable writes outside the root."""
     root = tmp_path / "artifacts"

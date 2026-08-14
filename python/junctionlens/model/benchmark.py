@@ -7,7 +7,7 @@ import platform
 import resource
 import time
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 import onnxruntime as ort
@@ -17,6 +17,7 @@ from junctionlens.model.budget import BudgetPlan
 from junctionlens.model.profile import M0ModelProfile
 from junctionlens.model.spike import INPUT_NAMES, OUTPUT_NAMES
 from junctionlens.model.synthetic import make_micro_inputs
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object_path
 
 
 class BenchmarkError(RuntimeError):
@@ -25,8 +26,12 @@ class BenchmarkError(RuntimeError):
 
 def _read_report(path: Path, required_status: str) -> dict[str, Any]:
     try:
-        value = cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
-    except (OSError, json.JSONDecodeError, TypeError) as error:
+        value = load_json_object_path(
+            path,
+            "M0 prerequisite report",
+            ParseLimits(max_bytes=16 * 1024 * 1024, max_depth=24, max_nodes=500_000),
+        )
+    except (OSError, ParseBoundaryError, TypeError) as error:
         raise BenchmarkError(f"cannot read prerequisite report {path}") from error
     if value.get("status") != required_status:
         raise BenchmarkError(f"prerequisite report {path} is not {required_status}")

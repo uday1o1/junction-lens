@@ -11,6 +11,7 @@ from google.protobuf.message import DecodeError
 
 from junctionlens.contract.limits import MAX_SERIALIZED_BYTES
 from junctionlens.contract.validation import ContractViolation, validate_envelope
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object
 from junctionlens.v1 import scene_control_graph_pb2 as scg
 
 
@@ -47,10 +48,28 @@ def parse_json(payload: str | bytes) -> scg.SceneControlGraphEnvelope:
     """Parse strict ProtoJSON, rejecting fields this version cannot preserve."""
     encoded = payload.encode("utf-8") if isinstance(payload, str) else payload
     _bounded(encoded, "json")
+    try:
+        structured = load_json_object(
+            encoded,
+            "ProtoJSON",
+            ParseLimits(
+                max_bytes=MAX_SERIALIZED_BYTES,
+                max_depth=32,
+                max_nodes=1_000_000,
+                max_container_items=100_000,
+                max_string_bytes=4 * 1024 * 1024,
+            ),
+        )
+    except ParseBoundaryError as error:
+        raise ContractViolation("CONTRACT_JSON_MALFORMED", "json", error.detail) from error
     envelope = scg.SceneControlGraphEnvelope()
     try:
-        json_format.Parse(encoded.decode("utf-8"), envelope, ignore_unknown_fields=False)
-    except (json_format.ParseError, UnicodeDecodeError) as error:
+        json_format.Parse(
+            json.dumps(structured, allow_nan=False, separators=(",", ":")),
+            envelope,
+            ignore_unknown_fields=False,
+        )
+    except (json_format.ParseError, RecursionError) as error:
         raise ContractViolation("CONTRACT_JSON_MALFORMED", "json", str(error)) from error
     validate_envelope(envelope)
     return envelope

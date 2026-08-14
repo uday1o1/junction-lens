@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -13,6 +12,12 @@ from junctionlens.faults.models import FaultKind, PredictionBundle
 from junctionlens.faults.transforms import FaultTransformError, apply_fault
 from junctionlens.registry.service import EvidenceRegistry
 from junctionlens.registry.store import RegistryError, canonical_json_bytes
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object,
+    read_bounded_file,
+)
 
 _MAX_BUNDLE_BYTES = 512 * 1024 * 1024
 _MEDIA_TYPE = "application/vnd.junctionlens.prediction-bundle+json"
@@ -33,27 +38,20 @@ class FaultReceipt:
 
 
 def _strict_object(payload: bytes, label: str) -> Mapping[str, Any]:
-    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, value in items:
-            if key in result:
-                raise FaultError(f"{label} contains duplicate JSON key {key}")
-            result[key] = value
-        return result
-
     try:
-        value = json.loads(
+        return load_json_object(
             payload,
-            object_pairs_hook=reject_duplicates,
-            parse_constant=lambda item: (_ for _ in ()).throw(
-                FaultError(f"{label} contains nonfinite constant {item}")
+            label,
+            ParseLimits(
+                max_bytes=_MAX_BUNDLE_BYTES,
+                max_depth=32,
+                max_nodes=2_000_000,
+                max_container_items=1_000_000,
+                max_string_bytes=96 * 1024 * 1024,
             ),
         )
-    except json.JSONDecodeError as error:
-        raise FaultError(f"{label} is invalid JSON") from error
-    if not isinstance(value, dict):
-        raise FaultError(f"{label} must be a JSON object")
-    return cast(Mapping[str, Any], value)
+    except ParseBoundaryError as error:
+        raise FaultError(str(error)) from error
 
 
 def load_prediction_bundle(registry: EvidenceRegistry, manifest_sha256: str) -> PredictionBundle:
@@ -69,7 +67,14 @@ def load_prediction_bundle(registry: EvidenceRegistry, manifest_sha256: str) -> 
         raise FaultError("fault input has an unsupported prediction-bundle media type")
     if cast(int, payload["byte_size"]) > _MAX_BUNDLE_BYTES:
         raise FaultError("fault input exceeds the prediction-bundle byte limit")
-    raw = registry.store.object_path(cast(str, payload["sha256"])).read_bytes()
+    try:
+        raw = read_bounded_file(
+            registry.store.object_path(cast(str, payload["sha256"])),
+            "prediction bundle",
+            _MAX_BUNDLE_BYTES,
+        )
+    except ParseBoundaryError as error:
+        raise FaultError(str(error)) from error
     try:
         return PredictionBundle.model_validate(_strict_object(raw, "prediction bundle"))
     except ValueError as error:

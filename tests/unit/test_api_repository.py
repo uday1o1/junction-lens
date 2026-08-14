@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from junctionlens.api.models import ServiceConfig
-from junctionlens.api.repository import EvidenceReadError, EvidenceRepository
+from junctionlens.api.repository import EvidenceReadError, EvidenceRepository, VerifiedPayload
 from junctionlens.registry.service import EvidenceRegistry
 from junctionlens.registry.store import canonical_json_bytes
 
@@ -102,3 +102,25 @@ def test_repository_enforces_payload_byte_limit(tmp_path: Path) -> None:
 
     with pytest.raises(EvidenceReadError, match="response byte limit"):
         repository.open_payload(receipt.manifest_sha256)
+
+
+def test_verified_payload_rejects_symlinked_parent_component(tmp_path: Path) -> None:
+    root = tmp_path / "registered"
+    contained = root / "objects" / "sha256" / "aa"
+    contained.mkdir(parents=True)
+    payload = b"registered evidence"
+    digest = hashlib.sha256(payload).hexdigest()
+    path = contained / digest
+    path.write_bytes(payload)
+
+    assert VerifiedPayload(root, path, digest, len(payload), 1024).read() == payload
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / digest).write_bytes(payload)
+    path.unlink()
+    contained.rmdir()
+    contained.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(EvidenceReadError, match="opened safely"):
+        VerifiedPayload(root, path, digest, len(payload), 1024)

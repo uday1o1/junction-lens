@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -16,6 +15,7 @@ from junctionlens.model.e0_profile import E0Profile
 from junctionlens.model.e0_training import _hash_file
 from junctionlens.model.e1_profile import E1Profile
 from junctionlens.registry.store import canonical_json_bytes
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object_path
 
 
 class E1StudyError(RuntimeError):
@@ -98,30 +98,19 @@ def _validate_sha256(value: str, label: str) -> None:
 
 
 def _load_json(path: Path, label: str) -> Mapping[str, Any]:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 16 * 1024 * 1024:
-        raise E1StudyError(f"{label} must be a bounded regular file")
-
-    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, item in items:
-            if key in result:
-                raise E1StudyError(f"duplicate JSON object key: {key}")
-            result[key] = item
-        return result
-
     try:
-        value = json.loads(
-            path.read_bytes(),
-            object_pairs_hook=reject_duplicates,
-            parse_constant=lambda item: (_ for _ in ()).throw(
-                E1StudyError(f"nonfinite JSON constant: {item}")
+        return load_json_object_path(
+            path,
+            label,
+            ParseLimits(
+                max_bytes=16 * 1024 * 1024,
+                max_depth=24,
+                max_nodes=500_000,
+                max_container_items=100_000,
             ),
         )
-    except json.JSONDecodeError as error:
-        raise E1StudyError(f"{label} is invalid JSON") from error
-    if not isinstance(value, dict):
-        raise E1StudyError(f"{label} must be an object")
-    return cast(Mapping[str, Any], value)
+    except ParseBoundaryError as error:
+        raise E1StudyError(str(error)) from error
 
 
 def load_e1_study_evidence(path: Path) -> E1StudyEvidence:

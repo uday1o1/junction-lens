@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
-import yaml
 from platformdirs import user_cache_path
 
 from junctionlens.data.contracts import AdaptedFrame
@@ -27,6 +26,12 @@ from junctionlens.evaluator.official import (
     inspect_evaluator_image,
     load_evaluator_image_contract,
 )
+from junctionlens.security.parsing import (
+    ParseBoundaryError,
+    ParseLimits,
+    load_json_object,
+    load_yaml_object_path,
+)
 
 MAX_OFFICIAL_OUTPUT_BYTES = 16 * 1024 * 1024
 MAX_PARITY_FRAMES = 32
@@ -39,9 +44,15 @@ class AdapterParityError(RuntimeError):
 
 def load_parity_selector(path: Path) -> tuple[tuple[str, str, str], ...]:
     """Load one bounded, versioned list of frozen source frame identifiers."""
-    with path.open(encoding="utf-8") as source:
-        value = yaml.safe_load(source)
-    if not isinstance(value, dict) or set(value) != {"frames", "schema_version"}:
+    try:
+        value = load_yaml_object_path(
+            path,
+            "parity selector",
+            ParseLimits(max_bytes=1024 * 1024, max_depth=12, max_nodes=10_000),
+        )
+    except ParseBoundaryError as error:
+        raise AdapterParityError(str(error)) from error
+    if set(value) != {"frames", "schema_version"}:
         raise AdapterParityError("parity selector has invalid top-level keys")
     if value["schema_version"] != "junctionlens.openlane-parity-selector.v1":
         raise AdapterParityError("parity selector schema is unsupported")
@@ -258,8 +269,16 @@ def run_official_projection(
     if len(result.stdout.encode("utf-8")) > MAX_OFFICIAL_OUTPUT_BYTES:
         raise AdapterParityError("official adapter projection exceeds the output byte limit")
     try:
-        value = json.loads(result.stdout)
-    except json.JSONDecodeError as error:
+        value = load_json_object(
+            result.stdout.encode(),
+            "official adapter projection",
+            ParseLimits(
+                max_bytes=MAX_OFFICIAL_OUTPUT_BYTES,
+                max_depth=32,
+                max_nodes=1_000_000,
+            ),
+        )
+    except ParseBoundaryError as error:
         raise AdapterParityError("official adapter projection returned invalid JSON") from error
     if (
         not isinstance(value, dict)

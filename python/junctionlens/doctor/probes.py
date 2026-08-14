@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import platform
 import re
@@ -11,7 +10,6 @@ import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 
 from junctionlens.doctor.models import (
     CapabilityEvidence,
@@ -19,6 +17,7 @@ from junctionlens.doctor.models import (
     CapabilityState,
     HostEvidence,
 )
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object
 
 _OUTPUT_LIMIT = 4096
 _VERSION_PATTERN = re.compile(r"(?<!\d)(\d+(?:\.\d+){1,3})(?!\d)")
@@ -342,8 +341,12 @@ def probe_cpp_truth_file(project_root: Path) -> CapabilityEvidence:
         )
     result = _run([str(candidate)])
     try:
-        payload: dict[str, Any] = json.loads(result.stdout)
-    except (json.JSONDecodeError, TypeError):
+        payload = load_json_object(
+            result.stdout.encode(),
+            "C++ truth probe output",
+            ParseLimits(max_bytes=_OUTPUT_LIMIT, max_depth=8, max_nodes=128),
+        )
+    except (ParseBoundaryError, TypeError):
         return CapabilityEvidence(
             capability="cpp_truth_probe",
             state=CapabilityState.ERROR,

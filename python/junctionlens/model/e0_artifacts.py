@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -11,6 +10,7 @@ from typing import Any, cast
 
 from junctionlens.model.e0_profile import E0Profile
 from junctionlens.registry.store import canonical_json_bytes
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object_path
 
 
 class E0ArtifactError(RuntimeError):
@@ -18,15 +18,19 @@ class E0ArtifactError(RuntimeError):
 
 
 def _load_object(path: Path, label: str) -> Mapping[str, Any]:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 16 * 1024 * 1024:
-        raise E0ArtifactError(f"{label} must be a bounded regular file")
     try:
-        value = json.loads(path.read_bytes())
-    except json.JSONDecodeError as error:
-        raise E0ArtifactError(f"{label} is invalid JSON") from error
-    if not isinstance(value, dict):
-        raise E0ArtifactError(f"{label} must be an object")
-    return cast(Mapping[str, Any], value)
+        return load_json_object_path(
+            path,
+            label,
+            ParseLimits(
+                max_bytes=16 * 1024 * 1024,
+                max_depth=24,
+                max_nodes=500_000,
+                max_container_items=100_000,
+            ),
+        )
+    except ParseBoundaryError as error:
+        raise E0ArtifactError(str(error)) from error
 
 
 def _hash(path: Path) -> str:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import errno
 import hashlib
-import json
 import os
 import platform
 import shutil
@@ -16,6 +15,7 @@ from pathlib import Path
 from types import TracebackType
 
 from junctionlens.registry.store import canonical_json_bytes
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object_path
 
 
 class RegistryLockError(RuntimeError):
@@ -79,28 +79,21 @@ class RegistryWriterLock:
 
     @staticmethod
     def _read_owner(path: Path) -> LockOwner:
-        if path.is_symlink() or not path.is_file() or path.stat().st_size > 64 * 1024:
-            raise RegistryLockError("registry writer lock owner record is invalid")
-
-        def reject_duplicates(items: list[tuple[str, object]]) -> dict[str, object]:
-            result: dict[str, object] = {}
-            for key, item in items:
-                if key in result:
-                    raise RegistryLockError(f"duplicate registry lock owner key: {key}")
-                result[key] = item
-            return result
-
         try:
-            value = json.loads(
-                path.read_bytes(),
-                object_pairs_hook=reject_duplicates,
-                parse_constant=lambda item: (_ for _ in ()).throw(
-                    RegistryLockError(f"nonfinite registry lock owner value: {item}")
+            value = load_json_object_path(
+                path,
+                "registry writer lock owner",
+                ParseLimits(
+                    max_bytes=64 * 1024,
+                    max_depth=8,
+                    max_nodes=128,
+                    max_container_items=32,
+                    max_string_bytes=4096,
                 ),
             )
-        except json.JSONDecodeError as error:
+        except ParseBoundaryError as error:
             raise RegistryLockError("registry writer lock owner record is invalid JSON") from error
-        if not isinstance(value, dict) or set(value) != {
+        if set(value) != {
             "created_ns",
             "heartbeat_ns",
             "host_fingerprint",

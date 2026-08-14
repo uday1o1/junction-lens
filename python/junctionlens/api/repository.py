@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
-import json
 import math
 import os
 import stat
 from collections.abc import Iterator, Mapping
 from decimal import Decimal
+from io import BytesIO
 from pathlib import Path
 from typing import Any, BinaryIO, cast
 
 import duckdb
+import pyarrow as pa
+import pyarrow.parquet as pq
+from PIL import Image
 from pydantic import JsonValue
 
 from junctionlens.api.models import (
@@ -25,6 +28,7 @@ from junctionlens.api.models import (
     ServiceConfig,
 )
 from junctionlens.registry.store import ContentAddressedStore, RegistryError, canonical_json_bytes
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object
 
 _SHA256_LENGTH = 64
 _DECISION_MEDIA_TYPE = "application/vnd.junctionlens.gate-decision+json"
@@ -38,27 +42,14 @@ class EvidenceReadError(RuntimeError):
 
 
 def _strict_json_object(payload: bytes, label: str) -> dict[str, Any]:
-    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, value in items:
-            if key in result:
-                raise EvidenceReadError(f"{label} contains duplicate object key {key}")
-            result[key] = value
-        return result
-
     try:
-        value = json.loads(
+        return load_json_object(
             payload,
-            object_pairs_hook=reject_duplicates,
-            parse_constant=lambda item: (_ for _ in ()).throw(
-                EvidenceReadError(f"{label} contains nonfinite constant {item}")
-            ),
+            label,
+            ParseLimits(max_bytes=64 * 1024 * 1024, max_nodes=500_000),
         )
-    except json.JSONDecodeError as error:
-        raise EvidenceReadError(f"{label} is not valid JSON") from error
-    if not isinstance(value, dict):
-        raise EvidenceReadError(f"{label} must be a JSON object")
-    return value
+    except ParseBoundaryError as error:
+        raise EvidenceReadError(str(error)) from error
 
 
 def _validate_sha256(value: str, label: str) -> None:
@@ -70,7 +61,9 @@ def _validate_sha256(value: str, label: str) -> None:
         raise EvidenceReadError(f"{label} must be a lowercase SHA-256")
 
 
-def _json_value(value: object) -> JsonValue:
+def _json_value(value: object, *, depth: int, max_depth: int, max_items: int) -> JsonValue:
+    if depth > max_depth:
+        raise EvidenceReadError("metric value exceeds the nesting-depth limit")
     if value is None or isinstance(value, bool | int | str):
         return value
     if isinstance(value, float):
@@ -84,23 +77,64 @@ def _json_value(value: object) -> JsonValue:
     if isinstance(value, bytes):
         return value.hex()
     if isinstance(value, list | tuple):
-        return [_json_value(item) for item in value]
+        if len(value) > max_items:
+            raise EvidenceReadError("metric value exceeds the container-item limit")
+        return [
+            _json_value(item, depth=depth + 1, max_depth=max_depth, max_items=max_items)
+            for item in value
+        ]
     if isinstance(value, Mapping):
-        return {str(key): _json_value(item) for key, item in value.items()}
+        if len(value) > max_items:
+            raise EvidenceReadError("metric value exceeds the container-item limit")
+        return {
+            str(key): _json_value(
+                item,
+                depth=depth + 1,
+                max_depth=max_depth,
+                max_items=max_items,
+            )
+            for key, item in value.items()
+        }
     raise EvidenceReadError(f"metric table contains unsupported value type {type(value).__name__}")
 
 
 class VerifiedPayload:
     """An already hashed file descriptor retained until response consumption."""
 
-    def __init__(self, path: Path, expected_sha256: str, expected_size: int, limit: int) -> None:
+    def __init__(
+        self,
+        root: Path,
+        path: Path,
+        expected_sha256: str,
+        expected_size: int,
+        limit: int,
+    ) -> None:
         if expected_size > limit:
             raise EvidenceReadError("artifact payload exceeds the response byte limit")
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
         try:
-            descriptor = os.open(path, flags)
-        except OSError as error:
+            relative = path.relative_to(root)
+        except ValueError as error:
+            raise EvidenceReadError("artifact payload is outside the registered root") from error
+        if not relative.parts or any(part in {"", ".", ".."} for part in relative.parts):
+            raise EvidenceReadError("artifact payload has an unsafe contained path")
+        directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        directories: list[int] = []
+        try:
+            current = os.open(root, directory_flags)
+            directories.append(current)
+            for part in relative.parts[:-1]:
+                current = os.open(part, directory_flags, dir_fd=current)
+                directories.append(current)
+            descriptor = os.open(
+                relative.parts[-1],
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=current,
+            )
+        except (OSError, TypeError) as error:
             raise EvidenceReadError("artifact payload cannot be opened safely") from error
+        finally:
+            for directory in reversed(directories):
+                os.close(directory)
         self._source: BinaryIO | None = os.fdopen(descriptor, "rb", closefd=True)
         try:
             details = os.fstat(descriptor)
@@ -361,6 +395,7 @@ class EvidenceRepository:
         payload_limit = self.config.max_artifact_bytes if limit is None else limit
         path = self.store.object_path(artifact.payload_sha256)
         return VerifiedPayload(
+            self.root,
             path,
             artifact.payload_sha256,
             artifact.payload_byte_size,
@@ -384,6 +419,41 @@ class EvidenceRepository:
             raise EvidenceReadError("release decision identity does not match its content")
         return cast(dict[str, JsonValue], decision)
 
+    def image_payload(self, manifest_sha256: str) -> bytes:
+        """Return one integrity-checked raster after verifying its real format and dimensions."""
+        artifact = self.artifact(manifest_sha256)
+        expected_formats = {
+            "image/jpeg": "JPEG",
+            "image/png": "PNG",
+            "image/webp": "WEBP",
+        }
+        expected = expected_formats.get(artifact.media_type)
+        if expected is None:
+            raise EvidenceReadError("artifact is not a supported raster image")
+        payload = self.open_payload(
+            manifest_sha256,
+            limit=self.config.max_image_bytes,
+        ).read()
+        try:
+            with Image.open(BytesIO(payload)) as image:
+                width, height = image.size
+                if image.format != expected:
+                    raise EvidenceReadError("image bytes do not match the registered media type")
+                if (
+                    width < 1
+                    or height < 1
+                    or width > self.config.max_image_width
+                    or height > self.config.max_image_height
+                    or width * height > self.config.max_image_pixels
+                ):
+                    raise EvidenceReadError("image dimensions exceed the response limit")
+                image.verify()
+        except EvidenceReadError:
+            raise
+        except (Image.DecompressionBombError, OSError) as error:
+            raise EvidenceReadError("registered image payload is malformed") from error
+        return payload
+
     def metric_rows(
         self, manifest_sha256: str, offset: int, limit: int
     ) -> tuple[tuple[str, ...], tuple[dict[str, JsonValue], ...], PageInfo]:
@@ -396,36 +466,46 @@ class EvidenceRepository:
             "benchmark",
         }:
             raise EvidenceReadError("artifact is not a registered metric table")
-        verified = self.open_payload(manifest_sha256, limit=self.config.max_metric_table_bytes)
-        verified.close()
-        path = self.store.object_path(artifact.payload_sha256)
-        connection = self._connect()
+        payload = self.open_payload(
+            manifest_sha256,
+            limit=self.config.max_metric_table_bytes,
+        ).read()
         try:
-            count_row = connection.execute(
-                "SELECT COUNT(*) FROM read_parquet(?)", [str(path)]
-            ).fetchone()
-            if count_row is None:
-                raise EvidenceReadError("metric table count query returned no row")
-            total = int(count_row[0])
-            cursor = connection.execute(
-                "SELECT * FROM read_parquet(?) LIMIT ? OFFSET ?",
-                [str(path), limit, offset],
-            )
-            if cursor.description is None:
-                raise EvidenceReadError("metric table query returned no schema")
-            columns = tuple(str(item[0]) for item in cursor.description)
-            raw_rows = cursor.fetchall()
-        except duckdb.Error as error:
+            parquet = pq.ParquetFile(pa.BufferReader(payload))
+            total = parquet.metadata.num_rows
+            if total > self.config.max_metric_rows:
+                raise EvidenceReadError("metric table exceeds the row limit")
+            columns = tuple(parquet.schema_arrow.names)
+            if len(columns) > self.config.max_metric_columns:
+                raise EvidenceReadError("metric table exceeds the column limit")
+            if len(columns) != len(set(columns)):
+                raise EvidenceReadError("metric table contains duplicate column names")
+            page_rows: list[dict[str, object]] = []
+            position = 0
+            for batch in parquet.iter_batches(batch_size=min(1024, max(limit, 1))):
+                batch_end = position + batch.num_rows
+                if batch_end > offset and position < offset + limit:
+                    start = max(offset - position, 0)
+                    count = min(batch.num_rows - start, offset + limit - (position + start))
+                    page_rows.extend(batch.slice(start, count).to_pylist())
+                position = batch_end
+                if position >= offset + limit:
+                    break
+        except EvidenceReadError:
+            raise
+        except (OSError, pa.ArrowException) as error:
             raise EvidenceReadError("registered metric table cannot be read") from error
-        finally:
-            connection.close()
-        second_verification = self.open_payload(
-            manifest_sha256, limit=self.config.max_metric_table_bytes
-        )
-        second_verification.close()
         rows = tuple(
-            {column: _json_value(value) for column, value in zip(columns, row, strict=True)}
-            for row in raw_rows
+            {
+                column: _json_value(
+                    row[column],
+                    depth=1,
+                    max_depth=self.config.max_metric_value_depth,
+                    max_items=self.config.max_metric_value_items,
+                )
+                for column in columns
+            }
+            for row in page_rows
         )
         return (
             columns,

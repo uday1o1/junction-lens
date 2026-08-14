@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import html
 import importlib.metadata
-import json
 import platform
 import shutil
 import tempfile
@@ -21,6 +20,7 @@ from junctionlens.api.models import ServiceConfig
 from junctionlens.api.repository import EvidenceReadError, EvidenceRepository
 from junctionlens.registry.service import EvidenceRegistry
 from junctionlens.registry.store import ArtifactReceipt, RegistryError, canonical_json_bytes
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object
 
 _REPORT_DATA_MEDIA_TYPE = "application/vnd.junctionlens.comparison-report-data+json"
 _PARQUET_MEDIA_TYPE = "application/vnd.apache.parquet"
@@ -129,27 +129,20 @@ class EvidenceBundleReceipt:
 
 
 def _strict_json(payload: bytes, label: str) -> dict[str, Any]:
-    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, value in items:
-            if key in result:
-                raise EvidenceBundleError(f"{label} contains duplicate JSON key {key}")
-            result[key] = value
-        return result
-
     try:
-        value = json.loads(
+        return load_json_object(
             payload,
-            object_pairs_hook=reject_duplicates,
-            parse_constant=lambda item: (_ for _ in ()).throw(
-                EvidenceBundleError(f"{label} contains nonfinite constant {item}")
+            label,
+            ParseLimits(
+                max_bytes=_MAX_REPORT_DATA_BYTES,
+                max_depth=32,
+                max_nodes=500_000,
+                max_container_items=100_000,
+                max_string_bytes=4 * 1024 * 1024,
             ),
         )
-    except json.JSONDecodeError as error:
-        raise EvidenceBundleError(f"{label} is invalid JSON") from error
-    if not isinstance(value, dict):
-        raise EvidenceBundleError(f"{label} must be a JSON object")
-    return cast(dict[str, Any], value)
+    except ParseBoundaryError as error:
+        raise EvidenceBundleError(str(error)) from error
 
 
 def _sha256_bytes(payload: bytes) -> str:

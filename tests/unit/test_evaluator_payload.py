@@ -86,6 +86,16 @@ def test_file_loader_rejects_duplicate_json_frame_keys(tmp_path: Path) -> None:
         load_payload(path)
 
 
+def test_file_loader_rejects_symlink_input(tmp_path: Path) -> None:
+    target = tmp_path / "payload.json"
+    target.write_text("{}", encoding="utf-8")
+    alias = tmp_path / "alias.json"
+    alias.symlink_to(target)
+
+    with pytest.raises(EvaluatorPayloadError, match="regular file"):
+        load_payload(alias)
+
+
 def test_fixture_replacement_cannot_create_a_new_path() -> None:
     payload = copy.deepcopy(_perfect())
     with pytest.raises(FixtureError, match="does not exist"):

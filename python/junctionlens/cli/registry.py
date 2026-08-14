@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, Any
@@ -11,6 +10,7 @@ import typer
 
 from junctionlens.cli.output import emit
 from junctionlens.registry.service import EvidenceRegistry, RunIdentity
+from junctionlens.security.parsing import ParseLimits, load_json_object_path
 
 registry_app = typer.Typer(
     help="Store, index, resume, and inspect immutable evidence.", no_args_is_help=True
@@ -22,27 +22,17 @@ def _print(value: object) -> None:
 
 
 def _load_object(path: Path, label: str) -> dict[str, Any]:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 16 * 1024 * 1024:
-        raise ValueError(f"{label} must be a bounded regular file")
-
-    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, value in items:
-            if key in result:
-                raise ValueError(f"duplicate JSON object key: {key}")
-            result[key] = value
-        return result
-
-    value = json.loads(
-        path.read_bytes(),
-        object_pairs_hook=reject_duplicates,
-        parse_constant=lambda item: (_ for _ in ()).throw(
-            ValueError(f"nonfinite JSON constant: {item}")
+    return load_json_object_path(
+        path,
+        label,
+        ParseLimits(
+            max_bytes=16 * 1024 * 1024,
+            max_depth=24,
+            max_nodes=500_000,
+            max_container_items=100_000,
+            max_string_bytes=4 * 1024 * 1024,
         ),
     )
-    if not isinstance(value, dict):
-        raise ValueError(f"{label} must be an object")
-    return value
 
 
 def _registry(root: Path, schema: Path) -> EvidenceRegistry:

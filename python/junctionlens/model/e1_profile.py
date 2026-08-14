@@ -7,10 +7,10 @@ import json
 from pathlib import Path
 from typing import Literal
 
-import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from junctionlens.model.e0_profile import E0Profile
+from junctionlens.security.parsing import ParseLimits, load_yaml_object_path
 
 
 class _Frozen(BaseModel):
@@ -86,10 +86,11 @@ class E1Profile(_Frozen):
 
 
 def load_e1_profile(path: Path, base: E0Profile) -> E1Profile:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 1024 * 1024:
-        raise ValueError("E1 profile must be a bounded regular file")
-    with path.open(encoding="utf-8") as source:
-        value = yaml.safe_load(source)
+    value = load_yaml_object_path(
+        path,
+        "E1 model profile",
+        ParseLimits(max_bytes=1024 * 1024, max_depth=16, max_nodes=10_000),
+    )
     profile = E1Profile.model_validate(value)
     profile.validate_base(base)
     return profile

@@ -7,8 +7,9 @@ import json
 from pathlib import Path
 from typing import Literal
 
-import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from junctionlens.security.parsing import ParseLimits, load_yaml_object_path
 
 
 class _Frozen(BaseModel):
@@ -150,8 +151,11 @@ class E0Profile(_Frozen):
 
 
 def load_e0_profile(path: Path) -> E0Profile:
-    with path.open(encoding="utf-8") as source:
-        value = yaml.safe_load(source)
+    value = load_yaml_object_path(
+        path,
+        "E0 model profile",
+        ParseLimits(max_bytes=1024 * 1024, max_depth=16, max_nodes=10_000),
+    )
     return E0Profile.model_validate(value)
 
 

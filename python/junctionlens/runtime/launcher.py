@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from junctionlens.model.profile import load_m0_profile
+from junctionlens.security.parsing import ParseBoundaryError, ParseLimits, load_json_object
 
 
 class RuntimeLaunchError(RuntimeError):
@@ -168,8 +168,12 @@ def run_batch(
     if completed.returncode != 0:
         raise RuntimeLaunchError(f"native runtime failed: {completed.stderr.strip()}")
     try:
-        receipt = cast(dict[str, Any], json.loads(completed.stdout))
-    except (json.JSONDecodeError, TypeError) as error:
+        receipt = load_json_object(
+            completed.stdout.encode(),
+            "native runtime output",
+            ParseLimits(max_bytes=16 * 1024 * 1024, max_depth=24, max_nodes=500_000),
+        )
+    except (ParseBoundaryError, TypeError) as error:
         raise RuntimeLaunchError("native runtime returned malformed JSON") from error
     expected = {
         "schema_version": "junctionlens.runtime-batch.v1",

@@ -36,6 +36,17 @@
         "JUNCTIONLENS_ENABLE_CUDA_RUNTIME": "ON",
         "JUNCTIONLENS_ONNXRUNTIME_ROOT": "${sourceDir}/.tools/onnxruntime-gpu-cpp/1.25.0"
       }
+    },
+    {
+      "name": "fuzz",
+      "displayName": "Clang ASan and UBSan parser mutation smoke",
+      "inherits": "sanitizers",
+      "binaryDir": "${sourceDir}/build/fuzz",
+      "cacheVariables": {
+        "BUILD_TESTING": "OFF",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "JUNCTIONLENS_ENABLE_FUZZING": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -55,6 +66,13 @@
     {
       "name": "gpu",
       "configurePreset": "gpu"
+    },
+    {
+      "name": "fuzz",
+      "configurePreset": "fuzz",
+      "targets": [
+        "junctionlens-contract-fuzz-smoke"
+      ]
     }
   ],
   "testPresets": [
