@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 from collections.abc import Mapping
@@ -13,6 +12,7 @@ from typing import Annotated, Any, cast
 import typer
 import yaml
 
+from junctionlens.cli.output import emit
 from junctionlens.data.audit import audit_report
 from junctionlens.data.license import (
     DatasetRegistrationError,
@@ -46,7 +46,7 @@ data_app = typer.Typer(help="Acknowledge, register, audit, and verify licensed d
 
 
 def _emit(payload: object) -> None:
-    typer.echo(json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False))
+    emit(payload)
 
 
 def _fail(error: Exception) -> None:
@@ -314,7 +314,8 @@ def manifest_command(
     )
 
 
-@data_app.command("freeze-splits")
+@data_app.command("split")
+@data_app.command("freeze-splits", hidden=True)
 def freeze_splits_command(
     frame_manifest_sha256: Annotated[
         str,

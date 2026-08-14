@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from junctionlens.cli.output import emit
 from junctionlens.data.license import DatasetRegistrationError, load_registration
 from junctionlens.data.manifests import ManifestError
 from junctionlens.data.openlane import OpenLaneAdapter, OpenLaneAdapterError
@@ -53,7 +53,7 @@ ProfileOption = Annotated[
 
 
 def _print(value: object) -> None:
-    typer.echo(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False))
+    emit(value)
 
 
 def _fail(error: Exception) -> None:

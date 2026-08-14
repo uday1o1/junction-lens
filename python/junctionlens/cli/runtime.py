@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated, Literal, cast
 
 import typer
 
+from junctionlens.cli.output import emit
 from junctionlens.runtime import RuntimeLaunchError, run_batch
 
 
@@ -77,4 +77,4 @@ def infer_command(
     except (OSError, RuntimeLaunchError, ValueError) as error:
         typer.echo(f"inference error: {error}", err=True)
         raise typer.Exit(code=2) from error
-    typer.echo(json.dumps(receipt, sort_keys=True, separators=(",", ":"), allow_nan=False))
+    emit(receipt)

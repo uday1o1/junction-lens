@@ -9,6 +9,7 @@ from typing import Annotated, Any
 
 import typer
 
+from junctionlens.cli.output import emit
 from junctionlens.registry.service import EvidenceRegistry, RunIdentity
 
 registry_app = typer.Typer(
@@ -17,7 +18,7 @@ registry_app = typer.Typer(
 
 
 def _print(value: object) -> None:
-    typer.echo(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False))
+    emit(value)
 
 
 def _load_object(path: Path, label: str) -> dict[str, Any]:

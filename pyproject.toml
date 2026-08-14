@@ -58,6 +58,7 @@ junctionlens = "junctionlens.cli.main:app"
 dev = [
   "coverage==7.10.1",
   "hypothesis==6.136.6",
+  "httpx==0.28.1",
   "mypy==1.17.0",
   "pytest==8.4.1",
   "pytest-cov==6.2.1",

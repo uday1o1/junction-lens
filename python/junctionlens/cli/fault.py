@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from junctionlens.cli.output import emit
 from junctionlens.faults.models import FaultKind
 from junctionlens.faults.service import FaultError, inject_fault, receipt_dict
 
@@ -38,7 +38,7 @@ def fault_command(
     except (FaultError, OSError, RuntimeError, TypeError, ValueError) as error:
         typer.echo(f"fault error: {error}", err=True)
         raise typer.Exit(code=2) from error
-    typer.echo(json.dumps(receipt_dict(receipt), sort_keys=True, separators=(",", ":")))
+    emit(receipt_dict(receipt))
 
 
 __all__ = ["fault_command"]

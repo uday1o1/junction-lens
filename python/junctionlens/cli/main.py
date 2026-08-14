@@ -13,9 +13,12 @@ from junctionlens.cli.contract import contract_app
 from junctionlens.cli.data import data_app
 from junctionlens.cli.fault import fault_command
 from junctionlens.cli.gate import gate_app
-from junctionlens.cli.model import model_app
+from junctionlens.cli.model import export_command, model_app, train_e0_command
+from junctionlens.cli.output import emit
 from junctionlens.cli.registry import registry_app
+from junctionlens.cli.report import report_command
 from junctionlens.cli.runtime import infer_command
+from junctionlens.cli.service import serve_command
 from junctionlens.cli.synthetic import synthetic_app
 from junctionlens.doctor.service import run_doctor
 from junctionlens.evaluator import EvaluationError, evaluate_custom, evaluate_official
@@ -39,10 +42,22 @@ app.add_typer(synthetic_app, name="synthetic")
 app.command("compare")(compare_command)
 app.command("fault")(fault_command)
 app.command("infer")(infer_command)
+app.command("train")(train_e0_command)
+app.command("export")(export_command)
+app.command("report")(report_command)
+app.command("serve")(serve_command)
 
 
 @app.callback()
-def main() -> None:
+def main(
+    human: Annotated[
+        bool,
+        typer.Option(
+            "--human",
+            help="Render command results for people instead of canonical compact JSON.",
+        ),
+    ] = False,
+) -> None:
     """Run a JunctionLens workflow command."""
 
 
@@ -87,7 +102,7 @@ def calibrate_command(
     except (EvidenceError, OSError, ValueError) as error:
         typer.echo(f"calibration error: {error}", err=True)
         raise typer.Exit(code=2) from error
-    typer.echo(json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False))
+    emit(result)
 
 
 @app.command("evaluate")
@@ -160,7 +175,7 @@ def evaluate_command(
     except (EvaluationError, OSError, ValueError) as error:
         typer.echo(f"evaluation error: {error}", err=True)
         raise typer.Exit(code=2) from error
-    typer.echo(json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False))
+    emit(result)
 
 
 if __name__ == "__main__":

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from junctionlens.cli.output import emit
 from junctionlens.gate.charter import CharterError, freeze_charter
 from junctionlens.gate.decision import DecisionError, persist_decision
 
@@ -15,7 +15,7 @@ gate_app = typer.Typer(help="Freeze and apply immutable release policy.", no_arg
 
 
 def _print(value: object) -> None:
-    typer.echo(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False))
+    emit(value)
 
 
 @gate_app.command("freeze")

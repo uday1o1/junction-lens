@@ -47,6 +47,7 @@ Repository commands:
   test-integration-faults
   test-integration-runtime
   test-integration-performance
+  test-integration-app
   test-web
   build-evaluator [--check-lock]
   test-evaluator
@@ -79,6 +80,7 @@ Repository commands:
   verify-m8-1-local
   verify-m8-2-local
   verify-m8-3-local
+  verify-m9-1
 EOF
 }
 
@@ -276,6 +278,12 @@ case "$JL_COMMAND" in
       "$JL_ROOT/tests/integration/test_runtime_cli.py" \
       "$@"
     ;;
+  test-integration-app)
+    uv run --locked pytest \
+      "$JL_ROOT/tests/unit/test_api_repository.py" \
+      "$JL_ROOT/tests/integration/test_app_cli_api.py" \
+      "$@"
+    ;;
   test-web)
     pnpm run typecheck:web
     pnpm run test:contract
@@ -433,6 +441,10 @@ case "$JL_COMMAND" in
     sh -n \
       "$JL_ROOT/scripts/gpu/qualify_remote.sh" \
       "$JL_ROOT/scripts/gpu/run_remote_qualification.sh"
+    ;;
+  verify-m9-1)
+    "$0" verify-m8-3-local
+    "$0" test-integration-app
     ;;
   -h|--help|help)
     usage

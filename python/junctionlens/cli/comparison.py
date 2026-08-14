@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from junctionlens.cli.output import emit
 from junctionlens.gate.comparison import ComparisonError, receipt_dict, run_comparison
 
 
@@ -52,7 +52,7 @@ def compare_command(
     except (ComparisonError, OSError, RuntimeError, TypeError, ValueError) as error:
         typer.echo(f"comparison error: {error}", err=True)
         raise typer.Exit(code=2) from error
-    typer.echo(json.dumps(receipt_dict(receipt), sort_keys=True, separators=(",", ":")))
+    emit(receipt_dict(receipt))
     if receipt.status != "PASS":
         raise typer.Exit(code=3)
 
