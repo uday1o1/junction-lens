@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.31)
 
 project(JunctionLens VERSION 0.1.0 LANGUAGES CXX)
 
+option(JUNCTIONLENS_ENABLE_CUDA_RUNTIME "Enable the isolated CUDA runtime artifact" OFF)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -83,6 +85,18 @@ if(NOT TARGET onnxruntime::onnxruntime)
   )
 endif()
 
+file(SHA256 "${_junctionlens_onnxruntime_library}" JUNCTIONLENS_ONNXRUNTIME_LIBRARY_SHA256)
+
+if(JUNCTIONLENS_ENABLE_CUDA_RUNTIME)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+    message(FATAL_ERROR "The accelerated runtime is qualified only on Linux x86-64")
+  endif()
+  find_package(CUDAToolkit 12.8 REQUIRED)
+  if(NOT CUDAToolkit_VERSION_MAJOR EQUAL 12 OR NOT CUDAToolkit_VERSION_MINOR EQUAL 8)
+    message(FATAL_ERROR "The accelerated runtime requires the locked CUDA 12.8 minor line")
+  endif()
+endif()
+
 add_executable(junctionlens-onnx-probe cpp/runtime/onnx_probe.cpp)
 target_link_libraries(junctionlens-onnx-probe PRIVATE onnxruntime::onnxruntime)
 set_target_properties(
@@ -98,6 +112,7 @@ add_library(
   STATIC
     cpp/src/infer/buffer_pool.cpp
     cpp/src/infer/preprocess.cpp
+    cpp/src/infer/provider.cpp
     cpp/src/infer/runtime.cpp
     cpp/src/infer/sha256.cpp
 )
@@ -127,6 +142,15 @@ target_link_libraries(
     opencv_imgcodecs
     opencv_imgproc
 )
+target_compile_definitions(
+  junctionlens_infer
+  PRIVATE
+    JUNCTIONLENS_ONNXRUNTIME_LIBRARY_SHA256="${JUNCTIONLENS_ONNXRUNTIME_LIBRARY_SHA256}"
+)
+if(JUNCTIONLENS_ENABLE_CUDA_RUNTIME)
+  target_compile_definitions(junctionlens_infer PRIVATE JUNCTIONLENS_ENABLE_CUDA_RUNTIME=1)
+  target_link_libraries(junctionlens_infer PRIVATE CUDA::cudart)
+endif()
 junctionlens_enable_sanitizers(junctionlens_infer)
 set_target_properties(
   junctionlens_infer

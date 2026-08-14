@@ -5,18 +5,27 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iomanip>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <numeric>
 #include <span>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
+
+#if defined(JUNCTIONLENS_ENABLE_CUDA_RUNTIME)
+#include <cuda_runtime_api.h>
+#endif
 
 #include "contract/validation.hpp"
 
@@ -27,8 +36,64 @@ constexpr std::string_view kInputContractSha256 =
     "cf5adc1545fa9b82f2a4429adab5c020bc64bd0357c908e5457f88dd62ea34ef";
 constexpr std::string_view kOutputContractSha256 =
     "84081fbd524a0439d2ec5f6c26fb33baf72cea11dceefd85241f7f4750b5f495";
-constexpr std::string_view kCpuProviderDigestInput =
-    "onnxruntime-1.25.0|CPUExecutionProvider|all-model-nodes";
+
+#if !defined(JUNCTIONLENS_ONNXRUNTIME_LIBRARY_SHA256)
+#error "JUNCTIONLENS_ONNXRUNTIME_LIBRARY_SHA256 must identify the linked runtime"
+#endif
+
+class ProviderLogCollector final {
+ public:
+  static void ORT_API_CALL Callback(void* parameter, OrtLoggingLevel severity, const char* category,
+                                    const char* log_id, const char* code_location,
+                                    const char* message) noexcept {
+    static_cast<void>(severity);
+    static_cast<void>(category);
+    static_cast<void>(log_id);
+    static_cast<void>(code_location);
+    if (parameter == nullptr || message == nullptr) {
+      return;
+    }
+    static_cast<ProviderLogCollector*>(parameter)->Capture(message);
+  }
+
+  [[nodiscard]] std::string raw_log() const {
+    if (collection_failed_.load()) {
+      throw RuntimeError("RUNTIME_PROVIDER_LOG", "provider log collection failed");
+    }
+    std::lock_guard<std::mutex> guard(mutex_);
+    return raw_log_;
+  }
+
+ private:
+  void Capture(const std::string_view message) noexcept {
+    try {
+      std::lock_guard<std::mutex> guard(mutex_);
+      if (message == "Node placements") {
+        collecting_ = true;
+        raw_log_.append(message);
+        raw_log_.push_back('\n');
+        return;
+      }
+      if (!collecting_) {
+        return;
+      }
+      if (message.starts_with(" All nodes placed on [") ||
+          message.starts_with(" Node(s) placed on [") || message.starts_with("  ")) {
+        raw_log_.append(message);
+        raw_log_.push_back('\n');
+      } else {
+        collecting_ = false;
+      }
+    } catch (...) {
+      collection_failed_.store(true);
+    }
+  }
+
+  mutable std::mutex mutex_;
+  std::string raw_log_;
+  bool collecting_ = false;
+  std::atomic<bool> collection_failed_ = false;
+};
 
 struct TensorSpec {
   std::string_view name;
@@ -101,6 +166,13 @@ void ValidateOptions(const RuntimeOptions& options) {
   if (!(options.node_threshold >= 0.0 && options.node_threshold <= 1.0) ||
       !(options.edge_threshold >= 0.0 && options.edge_threshold <= 1.0)) {
     throw RuntimeError("RUNTIME_THRESHOLD", "node and edge thresholds must be within [0, 1]");
+  }
+  if (options.provider.device_id < 0) {
+    throw RuntimeError("RUNTIME_PROVIDER_OPTIONS", "provider device ID cannot be negative");
+  }
+  if (options.provider.profile == ExecutionProviderProfile::kTensorRt &&
+      options.provider.cache_root.empty()) {
+    throw RuntimeError("RUNTIME_PROVIDER_OPTIONS", "TensorRT requires an explicit cache root");
   }
 }
 
@@ -585,7 +657,8 @@ void AddEdges(const std::vector<Ort::Value>& outputs, const RuntimeOptions& opti
 [[nodiscard]] v1::SceneControlGraphEnvelope Postprocess(const std::vector<Ort::Value>& outputs,
                                                         const PreprocessedInputs& inputs,
                                                         const RuntimeOptions& options,
-                                                        const std::string& model_sha256) {
+                                                        const std::string& model_sha256,
+                                                        const ProviderAssignment& assignment) {
   v1::SceneControlGraphEnvelope envelope;
   envelope.set_schema_major(1U);
   envelope.set_schema_minor(0U);
@@ -595,8 +668,9 @@ void AddEdges(const std::vector<Ort::Value>& outputs, const RuntimeOptions& opti
   producer->set_model_artifact_sha256(model_sha256);
   producer->set_configuration_sha256(options.producer.configuration_sha256);
   producer->set_runtime_build_sha256(options.producer.runtime_build_sha256);
-  producer->set_execution_provider_profile("cpu-fp32");
-  producer->set_provider_assignment_digest(Sha256Text(kCpuProviderDigestInput));
+  producer->set_execution_provider_profile(
+      std::string(ExecutionProviderProfileName(options.provider.profile)));
+  producer->set_provider_assignment_digest(assignment.canonical_sha256);
   auto* graph = envelope.mutable_graph();
   graph->set_role(v1::GRAPH_ROLE_PREDICTION);
   graph->mutable_frame_key()->CopyFrom(inputs.output_sensor_frame.frame_key());
@@ -611,32 +685,248 @@ void AddEdges(const std::vector<Ort::Value>& outputs, const RuntimeOptions& opti
   return envelope;
 }
 
+[[nodiscard]] std::filesystem::path PrepareProviderCache(const std::string& model_sha256,
+                                                         const ProviderOptions& options) {
+  if (options.profile != ExecutionProviderProfile::kTensorRt) {
+    return {};
+  }
+  std::error_code error;
+  std::filesystem::create_directories(options.cache_root, error);
+  if (error || !std::filesystem::is_directory(options.cache_root) ||
+      std::filesystem::is_symlink(options.cache_root)) {
+    throw RuntimeError("RUNTIME_CACHE_ROOT", "provider cache root is not a safe directory");
+  }
+  const std::filesystem::path target = options.cache_root / ProviderCacheKey(model_sha256, options);
+  if (std::filesystem::is_symlink(target)) {
+    throw RuntimeError("RUNTIME_CACHE_ROOT", "provider cache key resolves to a symbolic link");
+  }
+  std::filesystem::create_directories(target, error);
+  if (error || !std::filesystem::is_directory(target)) {
+    throw RuntimeError("RUNTIME_CACHE_ROOT", "provider cache directory could not be created");
+  }
+  return std::filesystem::canonical(target);
+}
+
+void ConfigureProviders(Ort::SessionOptions& session_options, const ProviderOptions& options,
+                        const std::vector<std::string>& available_providers,
+                        const std::filesystem::path& cache_directory) {
+  if (options.profile == ExecutionProviderProfile::kCpuReference) {
+    session_options.AppendExecutionProvider_CPU(1);
+    return;
+  }
+#if !defined(JUNCTIONLENS_ENABLE_CUDA_RUNTIME)
+  static_cast<void>(available_providers);
+  static_cast<void>(cache_directory);
+  throw RuntimeError("RUNTIME_ACCELERATED_BUILD_REQUIRED",
+                     "this CPU artifact cannot load accelerated execution providers");
+#else
+  const auto contains_provider = [&available_providers](const std::string_view expected) {
+    return std::find(available_providers.begin(), available_providers.end(), expected) !=
+           available_providers.end();
+  };
+  if (!contains_provider("CUDAExecutionProvider")) {
+    throw RuntimeError("RUNTIME_CUDA_PROVIDER_UNAVAILABLE",
+                       "CUDA execution provider is absent from the linked runtime");
+  }
+  if (cudaSetDevice(options.device_id) != cudaSuccess) {
+    throw RuntimeError("RUNTIME_CUDA_DEVICE", "CUDA device selection failed");
+  }
+  if (options.profile == ExecutionProviderProfile::kTensorRt) {
+    if (!contains_provider("TensorrtExecutionProvider")) {
+      throw RuntimeError("RUNTIME_TENSORRT_PROVIDER_UNAVAILABLE",
+                         "TensorRT execution provider is absent from the linked runtime");
+    }
+    Ort::TensorRTProviderOptions tensorrt_options;
+    tensorrt_options.Update({
+        {"device_id", std::to_string(options.device_id)},
+        {"trt_max_workspace_size", "2147483648"},
+        {"trt_fp16_enable", "1"},
+        {"trt_engine_cache_enable", "1"},
+        {"trt_engine_cache_path", cache_directory.string()},
+        {"trt_timing_cache_enable", "1"},
+        {"trt_timing_cache_path", cache_directory.string()},
+        {"trt_force_timing_cache", "0"},
+        {"trt_builder_optimization_level", "3"},
+        {"trt_auxiliary_streams", "0"},
+    });
+    session_options.AppendExecutionProvider_TensorRT_V2(*tensorrt_options);
+  }
+  Ort::CUDAProviderOptions cuda_options;
+  cuda_options.Update({
+      {"device_id", std::to_string(options.device_id)},
+      {"arena_extend_strategy", "kNextPowerOfTwo"},
+      {"cudnn_conv_algo_search", "EXHAUSTIVE"},
+      {"do_copy_in_default_stream", "1"},
+      {"cudnn_conv_use_max_workspace", "1"},
+  });
+  session_options.AppendExecutionProvider_CUDA_V2(*cuda_options);
+  session_options.AppendExecutionProvider_CPU(1);
+#endif
+}
+
+[[nodiscard]] std::vector<std::string> TensorNames(const std::vector<TensorSpec>& specs) {
+  std::vector<std::string> result;
+  result.reserve(specs.size());
+  for (const TensorSpec& spec : specs) {
+    result.emplace_back(spec.name);
+  }
+  return result;
+}
+
+#if defined(JUNCTIONLENS_ENABLE_CUDA_RUNTIME)
+void RequireCudaSuccess(const cudaError_t status, const std::string_view operation) {
+  if (status != cudaSuccess) {
+    throw RuntimeError("RUNTIME_CUDA_IO",
+                       std::string(operation) + " failed: " + cudaGetErrorString(status));
+  }
+}
+
+template <typename Element>
+void AppendDeviceInput(Ort::Allocator& allocator, Ort::MemoryInfo& memory,
+                       const std::vector<Element>& source, const std::vector<std::int64_t>& shape,
+                       const ONNXTensorElementDataType element_type,
+                       std::vector<Ort::MemoryAllocation>& allocations,
+                       std::vector<Ort::Value>& values) {
+  const std::size_t bytes = source.size() * sizeof(Element);
+  allocations.emplace_back(allocator.GetAllocation(bytes));
+  RequireCudaSuccess(
+      cudaMemcpy(allocations.back().get(), source.data(), bytes, cudaMemcpyHostToDevice),
+      "synchronous host-to-device input copy");
+  values.emplace_back(Ort::Value::CreateTensor(memory, allocations.back().get(), bytes,
+                                               shape.data(), shape.size(), element_type));
+}
+
+struct BoundHostOutputs {
+  std::vector<std::vector<float>> storage;
+  std::vector<Ort::Value> values;
+};
+
+[[nodiscard]] BoundHostOutputs RunWithDeviceBinding(
+    Ort::Session& session, const PreprocessedInputs& inputs, const int device_id,
+    const std::vector<std::int64_t>& image_shape, const std::vector<std::int64_t>& valid_shape,
+    const std::vector<std::int64_t>& intrinsic_shape,
+    const std::vector<std::int64_t>& transform_shape, const std::vector<std::int64_t>& ego_shape,
+    const std::vector<std::int64_t>& temporal_shape) {
+  Ort::MemoryInfo gpu_memory("Cuda", OrtDeviceAllocator, device_id, OrtMemTypeDefault);
+  Ort::Allocator gpu_allocator(session, gpu_memory);
+  std::vector<Ort::MemoryAllocation> input_allocations;
+  std::vector<Ort::Value> input_values;
+  input_allocations.reserve(InputSpecs().size());
+  input_values.reserve(InputSpecs().size());
+  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.images, image_shape,
+                    ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
+  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.camera_valid, valid_shape,
+                    ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL, input_allocations, input_values);
+  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.intrinsics, intrinsic_shape,
+                    ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
+  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.t_vehicle_camera, transform_shape,
+                    ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
+  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.ego_motion_previous_to_current, ego_shape,
+                    ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, input_allocations, input_values);
+  AppendDeviceInput(gpu_allocator, gpu_memory, inputs.temporal_valid, temporal_shape,
+                    ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL, input_allocations, input_values);
+
+  Ort::IoBinding binding(session);
+  for (std::size_t index = 0; index < InputSpecs().size(); ++index) {
+    binding.BindInput(InputSpecs()[index].name.data(), input_values[index]);
+  }
+  for (const TensorSpec& spec : OutputSpecs()) {
+    binding.BindOutput(spec.name.data(), gpu_memory);
+  }
+  binding.SynchronizeInputs();
+  session.Run(Ort::RunOptions{nullptr}, binding);
+  binding.SynchronizeOutputs();
+  std::vector<Ort::Value> device_outputs = binding.GetOutputValues();
+  if (device_outputs.size() != OutputSpecs().size()) {
+    throw RuntimeError("RUNTIME_OUTPUT_COUNT",
+                       "I/O binding output count differs from the contract");
+  }
+  BoundHostOutputs result;
+  result.storage.reserve(device_outputs.size());
+  result.values.reserve(device_outputs.size());
+  Ort::MemoryInfo cpu_memory = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+  for (std::size_t index = 0; index < device_outputs.size(); ++index) {
+    const auto type_and_shape = device_outputs[index].GetTensorTypeAndShapeInfo();
+    if (type_and_shape.GetElementType() != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
+      throw RuntimeError("RUNTIME_OUTPUT_TYPE", "bound output is not float32");
+    }
+    const std::size_t count = type_and_shape.GetElementCount();
+    result.storage.emplace_back(count);
+    RequireCudaSuccess(
+        cudaMemcpy(result.storage.back().data(), device_outputs[index].GetTensorData<float>(),
+                   count * sizeof(float), cudaMemcpyDeviceToHost),
+        "synchronous device-to-host output copy");
+    const std::vector<std::int64_t> shape = type_and_shape.GetShape();
+    result.values.emplace_back(MakeTensor(cpu_memory, result.storage.back(), shape));
+  }
+  return result;
+}
+#endif
+
 }  // namespace
 
 class CpuRuntime::Impl final {
  public:
   explicit Impl(RuntimeOptions selected_options)
       : options(std::move(selected_options)),
-        environment(ORT_LOGGING_LEVEL_WARNING, "junctionlens-runtime"),
+        environment(ORT_LOGGING_LEVEL_VERBOSE, "junctionlens-runtime",
+                    ProviderLogCollector::Callback, &provider_log),
         session_options(),
         model_sha256(Sha256File(options.model_path)) {
     ValidateOptions(options);
     session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
     session_options.SetIntraOpNumThreads(1);
     session_options.SetInterOpNumThreads(1);
-    session_options.AppendExecutionProvider_CPU(1);
+    session_options.SetLogSeverityLevel(0);
+    Ort::ThrowOnError(Ort::GetApi().SetSessionLogVerbosityLevel(session_options, 4));
+    const std::vector<std::string> available_providers = Ort::GetAvailableProviders();
+    cache_directory = PrepareProviderCache(model_sha256, options.provider);
+    ConfigureProviders(session_options, options.provider, available_providers, cache_directory);
     session =
         std::make_unique<Ort::Session>(environment, options.model_path.c_str(), session_options);
     ValidateTensorContract(*session, true);
     ValidateTensorContract(*session, false);
     ValidateMetadata(ReadMetadata(*session), options);
+    diagnostics.ort_version = Ort::GetVersionString();
+    diagnostics.ort_build_sha256 = JUNCTIONLENS_ONNXRUNTIME_LIBRARY_SHA256;
+    diagnostics.available_providers = available_providers;
+    diagnostics.model_sha256 = model_sha256;
+    diagnostics.input_names = TensorNames(InputSpecs());
+    diagnostics.output_names = TensorNames(OutputSpecs());
+    diagnostics.provider_log = provider_log.raw_log();
+    diagnostics.provider_assignment =
+        ParseProviderAssignmentLog(diagnostics.provider_log, diagnostics.ort_version,
+                                   diagnostics.ort_build_sha256, options.provider.profile);
+    diagnostics.provider_cache_key = ProviderCacheKey(model_sha256, options.provider);
+    diagnostics.io_binding_enabled =
+        options.provider.profile != ExecutionProviderProfile::kCpuReference;
+#if defined(JUNCTIONLENS_ENABLE_CUDA_RUNTIME)
+    if (diagnostics.io_binding_enabled) {
+      cudaDeviceProp properties{};
+      RequireCudaSuccess(cudaGetDeviceProperties(&properties, options.provider.device_id),
+                         "CUDA device property query");
+      diagnostics.gpu_name = properties.name;
+      std::ostringstream uuid;
+      uuid << "GPU-" << std::hex << std::setfill('0');
+      for (const signed char byte : properties.uuid.bytes) {
+        uuid << std::setw(2) << static_cast<unsigned int>(static_cast<unsigned char>(byte));
+      }
+      diagnostics.gpu_uuid = uuid.str();
+      diagnostics.gpu_compute_capability_major = properties.major;
+      diagnostics.gpu_compute_capability_minor = properties.minor;
+      diagnostics.gpu_memory_bytes = static_cast<std::uint64_t>(properties.totalGlobalMem);
+    }
+#endif
   }
 
   RuntimeOptions options;
+  ProviderLogCollector provider_log;
   Ort::Env environment;
   Ort::SessionOptions session_options;
   std::string model_sha256;
+  std::filesystem::path cache_directory;
   std::unique_ptr<Ort::Session> session;
+  RuntimeDiagnostics diagnostics;
 };
 
 CpuRuntime::CpuRuntime(RuntimeOptions options)
@@ -657,42 +947,61 @@ v1::SceneControlGraphEnvelope CpuRuntime::Infer(const PreprocessedInputs& inputs
     throw RuntimeError("RUNTIME_INPUT_SHAPE",
                        "preprocessed buffers differ from the frozen profile");
   }
-  Ort::MemoryInfo memory = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
   const std::vector<std::int64_t> image_shape = {1, 2, 8, 3, 384, 640};
   const std::vector<std::int64_t> valid_shape = {1, 2, 8};
   const std::vector<std::int64_t> intrinsic_shape = {1, 2, 8, 3, 3};
   const std::vector<std::int64_t> transform_shape = {1, 2, 8, 4, 4};
   const std::vector<std::int64_t> ego_shape = {1, 4, 4};
   const std::vector<std::int64_t> temporal_shape = {1};
-  std::vector<Ort::Value> input_values;
-  input_values.reserve(InputSpecs().size());
-  input_values.emplace_back(MakeTensor(memory, inputs.images, image_shape));
-  input_values.emplace_back(MakeBoolTensor(memory, inputs.camera_valid, valid_shape));
-  input_values.emplace_back(MakeTensor(memory, inputs.intrinsics, intrinsic_shape));
-  input_values.emplace_back(MakeTensor(memory, inputs.t_vehicle_camera, transform_shape));
-  input_values.emplace_back(MakeTensor(memory, inputs.ego_motion_previous_to_current, ego_shape));
-  input_values.emplace_back(MakeBoolTensor(memory, inputs.temporal_valid, temporal_shape));
-  std::vector<const char*> input_names;
-  std::vector<const char*> output_names;
-  for (const TensorSpec& spec : InputSpecs()) {
-    input_names.push_back(spec.name.data());
+  if (impl_->options.provider.profile == ExecutionProviderProfile::kCpuReference) {
+    Ort::MemoryInfo memory = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+    std::vector<Ort::Value> input_values;
+    input_values.reserve(InputSpecs().size());
+    input_values.emplace_back(MakeTensor(memory, inputs.images, image_shape));
+    input_values.emplace_back(MakeBoolTensor(memory, inputs.camera_valid, valid_shape));
+    input_values.emplace_back(MakeTensor(memory, inputs.intrinsics, intrinsic_shape));
+    input_values.emplace_back(MakeTensor(memory, inputs.t_vehicle_camera, transform_shape));
+    input_values.emplace_back(MakeTensor(memory, inputs.ego_motion_previous_to_current, ego_shape));
+    input_values.emplace_back(MakeBoolTensor(memory, inputs.temporal_valid, temporal_shape));
+    std::vector<const char*> input_names;
+    std::vector<const char*> output_names;
+    for (const TensorSpec& spec : InputSpecs()) {
+      input_names.push_back(spec.name.data());
+    }
+    for (const TensorSpec& spec : OutputSpecs()) {
+      output_names.push_back(spec.name.data());
+    }
+    const std::vector<Ort::Value> outputs =
+        impl_->session->Run(Ort::RunOptions{nullptr}, input_names.data(), input_values.data(),
+                            input_values.size(), output_names.data(), output_names.size());
+    if (outputs.size() != OutputSpecs().size()) {
+      throw RuntimeError("RUNTIME_OUTPUT_COUNT", "runtime output count differs from the contract");
+    }
+    for (std::size_t index = 0; index < outputs.size(); ++index) {
+      static_cast<void>(View(outputs, index));
+    }
+    lease.Advance(BufferState::kPostprocessing);
+    return Postprocess(outputs, inputs, impl_->options, impl_->model_sha256,
+                       impl_->diagnostics.provider_assignment);
   }
-  for (const TensorSpec& spec : OutputSpecs()) {
-    output_names.push_back(spec.name.data());
-  }
-  const std::vector<Ort::Value> outputs =
-      impl_->session->Run(Ort::RunOptions{nullptr}, input_names.data(), input_values.data(),
-                          input_values.size(), output_names.data(), output_names.size());
-  if (outputs.size() != OutputSpecs().size()) {
-    throw RuntimeError("RUNTIME_OUTPUT_COUNT", "runtime output count differs from the contract");
-  }
-  for (std::size_t index = 0; index < outputs.size(); ++index) {
-    static_cast<void>(View(outputs, index));
+#if !defined(JUNCTIONLENS_ENABLE_CUDA_RUNTIME)
+  throw RuntimeError("RUNTIME_ACCELERATED_BUILD_REQUIRED",
+                     "accelerated inference requires the GPU artifact");
+#else
+  BoundHostOutputs outputs = RunWithDeviceBinding(
+      *impl_->session, inputs, impl_->options.provider.device_id, image_shape, valid_shape,
+      intrinsic_shape, transform_shape, ego_shape, temporal_shape);
+  for (std::size_t index = 0; index < outputs.values.size(); ++index) {
+    static_cast<void>(View(outputs.values, index));
   }
   lease.Advance(BufferState::kPostprocessing);
-  return Postprocess(outputs, inputs, impl_->options, impl_->model_sha256);
+  return Postprocess(outputs.values, inputs, impl_->options, impl_->model_sha256,
+                     impl_->diagnostics.provider_assignment);
+#endif
 }
 
 const RuntimeOptions& CpuRuntime::options() const noexcept { return impl_->options; }
+
+const RuntimeDiagnostics& CpuRuntime::diagnostics() const noexcept { return impl_->diagnostics; }
 
 }  // namespace junctionlens::infer

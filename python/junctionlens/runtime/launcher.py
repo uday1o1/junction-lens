@@ -7,7 +7,7 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from junctionlens.model.profile import load_m0_profile
 
@@ -54,7 +54,7 @@ def _git_state(project_root: Path) -> tuple[str, bool]:
     return commit, bool(status.stdout.strip())
 
 
-def run_cpu_batch(
+def run_batch(
     *,
     model_path: Path,
     profile_path: Path,
@@ -65,12 +65,36 @@ def run_cpu_batch(
     project_root: Path,
     repeat_loads: int = 1,
     buffer_slots: int = 2,
+    provider_profile: Literal["cpu-reference", "cuda", "tensorrt"] = "cpu-reference",
+    provider_log_output: Path | None = None,
+    device_id: int = 0,
+    provider_cache_root: Path | None = None,
+    gpu_compute_capability: str | None = None,
+    cuda_version: str | None = None,
+    driver_compatibility_class: str | None = None,
+    tensorrt_version: str | None = None,
+    source_commit: str | None = None,
+    source_dirty: bool | None = None,
 ) -> dict[str, Any]:
-    """Execute the real C++ CPU path and validate its versioned receipt."""
+    """Execute the selected native provider profile and validate its receipt."""
     if not 1 <= repeat_loads <= 100:
         raise RuntimeLaunchError("repeat_loads must be within [1, 100]")
     if not 1 <= buffer_slots <= 1024:
         raise RuntimeLaunchError("buffer_slots must be within [1, 1024]")
+    if not 0 <= device_id <= 1024:
+        raise RuntimeLaunchError("device_id must be within [0, 1024]")
+    if provider_profile not in {"cpu-reference", "cuda", "tensorrt"}:
+        raise RuntimeLaunchError("provider_profile is invalid")
+    if provider_profile != "cpu-reference" and provider_log_output is None:
+        raise RuntimeLaunchError("accelerated profiles require provider_log_output")
+    if provider_profile == "tensorrt" and (
+        provider_cache_root is None
+        or not gpu_compute_capability
+        or not cuda_version
+        or not driver_compatibility_class
+        or not tensorrt_version
+    ):
+        raise RuntimeLaunchError("TensorRT requires every cache compatibility dimension")
     for path, label in (
         (model_path, "model"),
         (profile_path, "profile"),
@@ -82,7 +106,16 @@ def run_cpu_batch(
     if not asset_root.is_dir() or not project_root.is_dir():
         raise RuntimeLaunchError("asset root and project root must be directories")
     profile = load_m0_profile(profile_path)
-    commit, dirty = _git_state(project_root)
+    if (source_commit is None) != (source_dirty is None):
+        raise RuntimeLaunchError("source_commit and source_dirty must be supplied together")
+    if source_commit is None:
+        commit, dirty = _git_state(project_root)
+    else:
+        if len(source_commit) != 40 or any(
+            character not in "0123456789abcdef" for character in source_commit
+        ):
+            raise RuntimeLaunchError("source_commit is not a lowercase 40-character SHA")
+        commit, dirty = source_commit, bool(source_dirty)
     command = [
         str(runtime_binary.resolve()),
         "infer",
@@ -106,7 +139,22 @@ def run_cpu_batch(
         str(repeat_loads),
         "--buffer-slots",
         str(buffer_slots),
+        "--provider-profile",
+        provider_profile,
+        "--device-id",
+        str(device_id),
     ]
+    optional_arguments = (
+        ("--provider-log-output", provider_log_output),
+        ("--provider-cache-root", provider_cache_root),
+        ("--gpu-compute-capability", gpu_compute_capability),
+        ("--cuda-version", cuda_version),
+        ("--driver-compatibility-class", driver_compatibility_class),
+        ("--tensorrt-version", tensorrt_version),
+    )
+    for flag, optional_value in optional_arguments:
+        if optional_value is not None:
+            command.extend([flag, str(optional_value)])
     if dirty:
         command.append("--git-dirty")
     completed = subprocess.run(
@@ -126,7 +174,12 @@ def run_cpu_batch(
     expected = {
         "schema_version": "junctionlens.runtime-batch.v1",
         "status": "PASSED",
-        "provider": "CPUExecutionProvider",
+        "provider": {
+            "cpu-reference": "CPUExecutionProvider",
+            "cuda": "CUDAExecutionProvider",
+            "tensorrt": "TensorrtExecutionProvider",
+        }[provider_profile],
+        "io_binding_enabled": provider_profile != "cpu-reference",
         "processed_frames": sum(
             1
             for line in input_list_path.read_text(encoding="utf-8").splitlines()
@@ -136,10 +189,23 @@ def run_cpu_batch(
         "buffer_capacity": buffer_slots,
         "all_slots_free": True,
     }
-    for key, value in expected.items():
-        if receipt.get(key) != value:
+    for key, expected_value in expected.items():
+        if receipt.get(key) != expected_value:
             raise RuntimeLaunchError(f"native runtime receipt differs at {key}")
     high_water = receipt.get("buffer_high_water_mark")
     if not isinstance(high_water, int) or not 1 <= high_water <= buffer_slots:
         raise RuntimeLaunchError("native runtime reported an invalid buffer high-water mark")
+    for key in ("provider_assignment_sha256", "provider_log_sha256"):
+        value = receipt.get(key)
+        if (
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(character not in "0123456789abcdef" for character in value)
+        ):
+            raise RuntimeLaunchError(f"native runtime reported an invalid {key}")
+    if provider_log_output is not None and not provider_log_output.is_file():
+        raise RuntimeLaunchError("native runtime did not persist its provider log")
     return receipt
+
+
+run_cpu_batch = run_batch

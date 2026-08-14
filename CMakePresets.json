@@ -26,6 +26,16 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "JUNCTIONLENS_ENABLE_SANITIZERS": "ON"
       }
+    },
+    {
+      "name": "gpu",
+      "displayName": "Linux x86-64 CUDA qualification",
+      "inherits": "cpu",
+      "binaryDir": "${sourceDir}/build/gpu",
+      "cacheVariables": {
+        "JUNCTIONLENS_ENABLE_CUDA_RUNTIME": "ON",
+        "JUNCTIONLENS_ONNXRUNTIME_ROOT": "${sourceDir}/.tools/onnxruntime-gpu-cpp/1.25.0"
+      }
     }
   ],
   "buildPresets": [
@@ -41,6 +51,10 @@
         "junctionlens-eval-tests",
         "junctionlens-infer-tests"
       ]
+    },
+    {
+      "name": "gpu",
+      "configurePreset": "gpu"
     }
   ],
   "testPresets": [
@@ -63,6 +77,13 @@
         "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
         "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
       },
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gpu",
+      "configurePreset": "gpu",
       "output": {
         "outputOnFailure": true
       }

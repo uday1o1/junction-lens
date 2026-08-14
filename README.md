@@ -29,7 +29,8 @@ See [Visual and statistical data audit](docs/data-audit.md) for private calibrat
 See [Acceptance charter and release decisions](docs/acceptance-charter.md) for the pre-holdout policy freeze, paired bootstrap, stable reason codes, and immutable decision workflow.
 See [Paired comparison and release decisions](docs/paired-comparison.md) for exact-frame pairing, slice materialization, persisted report data, and the public comparison command.
 See [Structural fault lab](docs/fault-lab.md) for the mandatory graph, geometry, calibration, temporal, and runtime corruption matrix.
-See [Native CPU inference runtime](docs/runtime.md) for the bounded C++ batch path, preprocessing contract, output provenance, and parity evidence.
+See [Native inference runtime](docs/runtime.md) for the bounded C++ batch path, accelerated-provider design, preprocessing contract, output provenance, and parity evidence.
+See [Remote GPU qualification](docs/gpu-qualification.md) for secure source synchronization, target preflight, resumable phases, and the consolidated hardware handoff.
 
 See [E1 learned topology](docs/e1-learned-topology.md) for the directed edge heads, canonical matrix ordering, topology objective, and oracle-node versus predicted-node diagnostics.
 

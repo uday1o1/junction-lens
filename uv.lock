@@ -233,7 +233,7 @@ cuda = [
     { name = "numpy", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "onnx", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "onnx-ir", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "onnxruntime", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "onnxruntime-gpu", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "onnxscript", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "scipy", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
@@ -267,8 +267,8 @@ requires-dist = [
     { name = "onnx", marker = "extra == 'cpu'", specifier = "==1.18.0" },
     { name = "onnx-ir", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cuda'", specifier = "==1.0.0" },
     { name = "onnx-ir", marker = "extra == 'cpu'", specifier = "==1.0.0" },
-    { name = "onnxruntime", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cuda'", specifier = "==1.25.0" },
     { name = "onnxruntime", marker = "extra == 'cpu'", specifier = "==1.25.0" },
+    { name = "onnxruntime-gpu", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cuda'", specifier = "==1.25.0" },
     { name = "onnxscript", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cuda'", specifier = "==0.7.1" },
     { name = "onnxscript", marker = "extra == 'cpu'", specifier = "==0.7.1" },
     { name = "pillow", specifier = "==12.3.0" },
@@ -566,14 +566,28 @@ name = "onnxruntime"
 version = "1.25.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "flatbuffers", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
-    { name = "numpy", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
-    { name = "packaging", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
-    { name = "protobuf", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-junctionlens-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'darwin' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda') or (sys_platform == 'linux' and extra == 'extra-12-junctionlens-cpu' and extra == 'extra-12-junctionlens-cuda')" },
+    { name = "flatbuffers", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
+    { name = "numpy", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
+    { name = "packaging", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
+    { name = "protobuf", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7a/69/f98c6bda4c34ac382b70c36033a989ceffd1caf5afba47bd2ef26535850f/onnxruntime-1.25.0-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:8ecd3362de3fb496fb3e2d055a95d5acab611cf759a27609c6d99704c9d8f184", size = 17742518, upload-time = "2026-04-22T17:20:34.444Z" },
     { url = "https://files.pythonhosted.org/packages/a9/1b/d681878f227513917d8620e4ea504af5eb3313fc01f8aea7b19a976c65db/onnxruntime-1.25.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:be93baa694ef8e5831fcb7b542da21f502b122918b5b9612d9f02972e043ee01", size = 17996146, upload-time = "2026-04-22T17:19:53.792Z" },
+]
+
+[[package]]
+name = "onnxruntime-gpu"
+version = "1.25.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flatbuffers", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "numpy", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "packaging", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "protobuf", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/6d/2c13d3eff74caa9e59820a044a75becd34e9cbeeaf7617ad7679cdb1fdb7/onnxruntime_gpu-1.25.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2f0c36c63c8b0eb4091f2567067f480f66f0aedc189eb009545c98ce7e919056", size = 270342429, upload-time = "2026-04-22T17:28:10.526Z" },
 ]
 
 [[package]]

@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+  "platform": "linux-x86_64",
+  "onnxruntime_gpu": {
+    "version": "1.25.0",
+    "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.25.0/onnxruntime-linux-x64-gpu-1.25.0.tgz",
+    "sha256": "630d1c292a8e530425bc4047598ce30acece2c4b5b5f4f46b676212302c38d93",
+    "strip_components": 1
+  }
+}

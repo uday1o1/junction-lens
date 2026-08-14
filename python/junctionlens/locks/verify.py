@@ -94,6 +94,27 @@ def _validate_toolchains(payload: Mapping[str, Any]) -> None:
                 raise LockVerificationError(f"tool {name} asset {platform_name} has an invalid URL")
 
 
+def _validate_gpu_toolchain(payload: Mapping[str, Any]) -> None:
+    if payload.get("platform") != "linux-x86_64":
+        raise LockVerificationError("GPU toolchain lock must target linux-x86_64")
+    runtime = payload.get("onnxruntime_gpu")
+    if not isinstance(runtime, dict) or set(runtime) != {
+        "version",
+        "url",
+        "sha256",
+        "strip_components",
+    }:
+        raise LockVerificationError("GPU ONNX Runtime lock is incomplete")
+    if runtime.get("version") != "1.25.0" or runtime.get("strip_components") != 1:
+        raise LockVerificationError("GPU ONNX Runtime version or archive layout differs")
+    if runtime.get("url") != (
+        "https://github.com/microsoft/onnxruntime/releases/download/"
+        "v1.25.0/onnxruntime-linux-x64-gpu-1.25.0.tgz"
+    ):
+        raise LockVerificationError("GPU ONNX Runtime URL differs from the official release")
+    _require_hash(runtime.get("sha256"), _SHA256, "GPU ONNX Runtime archive sha256")
+
+
 def _validate_dataset(payload: Mapping[str, Any]) -> None:
     devkit = payload.get("devkit")
     if not isinstance(devkit, dict):
@@ -275,6 +296,7 @@ def _cmake_sources(path: Path) -> list[tuple[str, str, str]]:
 def validate_lock_set(root: Path) -> None:
     """Validate every lock structurally without network access."""
     _validate_toolchains(_load_json(root / "configs/toolchains/v1.lock.json"))
+    _validate_gpu_toolchain(_load_json(root / "configs/toolchains/gpu-v1.lock.json"))
     dataset = _load_yaml(root / "configs/data/openlane-v2-v2.1.lock.yaml")
     _validate_dataset(dataset)
     _validate_adapter_lock(root, dataset)
@@ -360,9 +382,16 @@ def _verify_image_manifests(root: Path, images: Mapping[str, Any]) -> None:
 def verify_online(root: Path) -> None:
     """Download every release archive and resolve every public identity."""
     toolchains = _load_json(root / "configs/toolchains/v1.lock.json")
+    gpu_toolchain = _load_json(root / "configs/toolchains/gpu-v1.lock.json")
     dataset = _load_yaml(root / "configs/data/openlane-v2-v2.1.lock.yaml")
     images = _load_yaml(root / "containers/images.lock")
     _verify_tool_archives(root, toolchains)
+    gpu_runtime = gpu_toolchain["onnxruntime_gpu"]
+    download_verified(
+        gpu_runtime["url"],
+        gpu_runtime["sha256"],
+        root / ".cache/lock-verification/onnxruntime-linux-x64-gpu-1.25.0.tgz",
+    )
     _verify_source_archives(root, dataset)
     _verify_image_manifests(root, images)
 

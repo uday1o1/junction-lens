@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -86,12 +87,59 @@ struct ProducerOptions {
   std::string runtime_build_sha256;
 };
 
+enum class ExecutionProviderProfile {
+  kCpuReference,
+  kCuda,
+  kTensorRt,
+};
+
+[[nodiscard]] std::string_view ExecutionProviderProfileName(
+    ExecutionProviderProfile profile) noexcept;
+
+struct ProviderOptions {
+  ExecutionProviderProfile profile = ExecutionProviderProfile::kCpuReference;
+  int device_id = 0;
+  std::filesystem::path cache_root;
+  std::string gpu_compute_capability;
+  std::string cuda_version;
+  std::string driver_compatibility_class;
+  std::string tensorrt_version;
+};
+
+struct ProviderAssignment {
+  std::string ort_version;
+  std::string ort_build_sha256;
+  std::string raw_log_sha256;
+  std::map<std::string, std::size_t> node_counts;
+  std::vector<std::string> cpu_nodes;
+  std::string canonical_sha256;
+};
+
+struct RuntimeDiagnostics {
+  std::string ort_version;
+  std::string ort_build_sha256;
+  std::vector<std::string> available_providers;
+  std::string model_sha256;
+  std::vector<std::string> input_names;
+  std::vector<std::string> output_names;
+  std::string provider_log;
+  ProviderAssignment provider_assignment;
+  std::string provider_cache_key;
+  bool io_binding_enabled = false;
+  std::string gpu_name;
+  std::string gpu_uuid;
+  int gpu_compute_capability_major = 0;
+  int gpu_compute_capability_minor = 0;
+  std::uint64_t gpu_memory_bytes = 0U;
+};
+
 struct RuntimeOptions {
   std::filesystem::path model_path;
   std::string expected_profile_sha256;
   ProducerOptions producer;
   double node_threshold = 0.5;
   double edge_threshold = 0.5;
+  ProviderOptions provider;
 };
 
 struct PreprocessedInputs {
@@ -121,6 +169,7 @@ class CpuRuntime final {
   [[nodiscard]] v1::SceneControlGraphEnvelope Infer(const PreprocessedInputs& inputs,
                                                     BufferLease& lease) const;
   [[nodiscard]] const RuntimeOptions& options() const noexcept;
+  [[nodiscard]] const RuntimeDiagnostics& diagnostics() const noexcept;
 
  private:
   class Impl;
@@ -129,5 +178,11 @@ class CpuRuntime final {
 
 [[nodiscard]] std::string Sha256File(const std::filesystem::path& path);
 [[nodiscard]] std::string Sha256Text(std::string_view value);
+[[nodiscard]] ProviderAssignment ParseProviderAssignmentLog(std::string_view raw_log,
+                                                            std::string_view ort_version,
+                                                            std::string_view ort_build_sha256,
+                                                            ExecutionProviderProfile profile);
+[[nodiscard]] std::string ProviderCacheKey(std::string_view model_sha256,
+                                           const ProviderOptions& options);
 
 }  // namespace junctionlens::infer

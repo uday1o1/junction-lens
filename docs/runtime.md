@@ -1,4 +1,4 @@
-# Native CPU inference runtime
+# Native inference runtime
 
 Milestone 8.1 provides a production C++20 CPU pipeline behind the public `junctionlens infer` command.
 The pipeline decodes repository-relative image artifacts, materializes the frozen two-timestamp tensor profile, runs ONNX Runtime 1.25.0 through `CPUExecutionProvider`, applies deterministic graph postprocessing, and writes SceneControlGraph V1 protobuf envelopes.
@@ -81,3 +81,33 @@ The native tests cover SHA-256 vectors, every legal buffer transition, skipped-s
 The integration gate exercises `junctionlens infer` on a real two-frame protobuf batch, loads and unloads three independent sessions, validates every output through the Python contract, and compares it with an independent Python ONNX Runtime postprocessor.
 The comparison requires exact field presence, exact node and edge counts, exact integer and enum values, exact deterministic IDs and binary decisions, and floating-point agreement within the frozen `1e-4` raw-output tolerance.
 Seeded malformed-protobuf, corrupted-image, and attempted-overwrite cases must fail while their nearby control passes.
+
+## Accelerated profile implementation state
+
+Milestone 8.2 adds an isolated Linux x86-64 GPU build without changing the CPU artifact or its dependencies.
+The GPU preset requires the locked CUDA 12.8 minor line and the exact ONNX Runtime 1.25.0 GPU release artifact.
+The local macOS package is `IMPLEMENTED_LOCAL`, while CUDA and TensorRT results remain `DEFERRED_HARDWARE` until the `runtime-cuda` remote profile passes on the qualification target.
+
+The mandatory `cuda` profile registers `CUDAExecutionProvider` followed by `CPUExecutionProvider`.
+The runtime rejects the profile if any model node is assigned to CPU.
+The conditional `tensorrt` profile registers TensorRT, CUDA, and CPU in that order, requires at least one TensorRT node, permits truthful partial CUDA coverage, and still rejects every CPU node.
+
+Accelerated inference allocates input tensors through the ONNX Runtime CUDA allocator and binds every input and output with `Ort::IoBinding`.
+Host-to-device and device-to-host copies use synchronous CUDA calls as explicit ownership boundaries.
+The CUDA provider keeps `do_copy_in_default_stream` enabled, and the runtime does not introduce a custom asynchronous stream in V1.
+
+`junctionlens-runtime doctor` reports the observed provider list, exact ONNX Runtime shared-library SHA-256, GPU identity, model hash, input and output names, provider node counts, provider-log hash, assignment digest, cache key, and I/O-binding state.
+The provider parser accepts only the exact ONNX Runtime 1.25.0 log grammar at the `VerifyEachNodeIsAssignedToAnEp` boundary and requires a concrete shared-library hash.
+Changing the runtime binary invalidates prior parser qualification evidence.
+
+The TensorRT engine and timing cache directory is the SHA-256 of the model, provider options, GPU compute capability, TensorRT version, CUDA version, driver compatibility class, device ID, and fixed shape profile.
+Existing symbolic-link cache roots are rejected, and `trt_force_timing_cache` remains disabled.
+
+The local accelerated implementation gate is:
+
+```sh
+./tools/jl verify-m8-2-local
+```
+
+This command proves the exact parser fixtures, fallback rejection, partial TensorRT reporting, cache invalidation, secure source synchronization, public CPU control path, formatting, linting, type checking, native tests, and inherited correctness gates.
+It does not claim CUDA correctness, performance, or TensorRT coverage on macOS.

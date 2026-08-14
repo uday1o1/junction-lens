@@ -98,6 +98,55 @@ TEST(Sha256, MatchesPublishedVectors) {
             "b00361a396177a9cb410ff61f20015ad");
 }
 
+TEST(ProviderAudit, ParsesQualifiedCpuAndCudaAssignments) {
+  const std::string build_hash(64U, 'a');
+  const auto cpu = ParseProviderAssignmentLog(
+      "Node placements\n All nodes placed on [CPUExecutionProvider]. Number of nodes: 376\n",
+      "1.25.0", build_hash, ExecutionProviderProfile::kCpuReference);
+  EXPECT_EQ(cpu.node_counts.at("CPUExecutionProvider"), 376U);
+  EXPECT_EQ(cpu.raw_log_sha256.size(), 64U);
+  EXPECT_EQ(cpu.canonical_sha256.size(), 64U);
+
+  const auto cuda = ParseProviderAssignmentLog(
+      "Node placements\n All nodes placed on [CUDAExecutionProvider]. Number of nodes: 376\n",
+      "1.25.0", build_hash, ExecutionProviderProfile::kCuda);
+  EXPECT_EQ(cuda.node_counts.at("CUDAExecutionProvider"), 376U);
+}
+
+TEST(ProviderAudit, RejectsFallbackAndUnqualifiedBuilds) {
+  const std::string raw =
+      "Node placements\n"
+      " Node(s) placed on [CUDAExecutionProvider]. Number of nodes: 375\n"
+      " Node(s) placed on [CPUExecutionProvider]. Number of nodes: 1\n"
+      "  shape_helper (Shape)\n";
+  EXPECT_THROW(static_cast<void>(ParseProviderAssignmentLog(raw, "1.25.0", std::string(64U, 'a'),
+                                                            ExecutionProviderProfile::kCuda)),
+               RuntimeError);
+  EXPECT_THROW(static_cast<void>(ParseProviderAssignmentLog(raw, "1.25.1", std::string(64U, 'a'),
+                                                            ExecutionProviderProfile::kCuda)),
+               RuntimeError);
+}
+
+TEST(ProviderAudit, RecordsPartialTensorRtAndContentAddressesCache) {
+  const auto assignment = ParseProviderAssignmentLog(
+      "Node placements\n"
+      " Node(s) placed on [TensorrtExecutionProvider]. Number of nodes: 300\n"
+      " Node(s) placed on [CUDAExecutionProvider]. Number of nodes: 76\n",
+      "1.25.0", std::string(64U, 'b'), ExecutionProviderProfile::kTensorRt);
+  EXPECT_EQ(assignment.node_counts.at("TensorrtExecutionProvider"), 300U);
+  EXPECT_EQ(assignment.node_counts.at("CUDAExecutionProvider"), 76U);
+  ProviderOptions options;
+  options.profile = ExecutionProviderProfile::kTensorRt;
+  options.device_id = 0;
+  options.gpu_compute_capability = "8.9";
+  options.cuda_version = "12.8.1";
+  options.driver_compatibility_class = "570";
+  options.tensorrt_version = "10.14.1.48";
+  const std::string first = ProviderCacheKey(std::string(64U, 'c'), options);
+  options.driver_compatibility_class = "575";
+  EXPECT_NE(first, ProviderCacheKey(std::string(64U, 'c'), options));
+}
+
 TEST(BufferPool, EnforcesOwnershipLifecycle) {
   BufferPool pool(2U);
   auto first = pool.Acquire();

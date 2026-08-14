@@ -30,7 +30,8 @@ This exception breaks the source-transfer deadlock without relaxing either local
 ### Scoped remote profiles
 
 The single public entry point remains `scripts/gpu/qualify_remote.sh`.
-The runner supports versioned `m0.3`, `core`, and `full-v1` profiles as later phase handlers become available.
+The runner supports versioned `m0.3`, `runtime-cuda`, `core`, and `full-v1` profiles as later phase handlers become available.
+The `runtime-cuda` profile isolates the Milestone 8.2 target gate so a passing accelerated-runtime qualification cannot be confused with the later portfolio core checkpoint.
 `PASSED` means every phase required by the selected profile passed.
 The `full-v1` profile remains the final consolidated qualification contract.
 

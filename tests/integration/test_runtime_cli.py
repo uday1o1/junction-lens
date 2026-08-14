@@ -204,16 +204,33 @@ def test_public_cli_matches_independent_postprocessor_and_releases_buffers(
     result = _invoke(model_path, input_list, tmp_path, output, repeat_loads=3)
     assert result.exit_code == 0, result.output
     receipt = json.loads(result.stdout)
-    assert receipt == {
+    assert {
+        key: receipt[key]
+        for key in (
+            "all_slots_free",
+            "buffer_capacity",
+            "buffer_high_water_mark",
+            "io_binding_enabled",
+            "processed_frames",
+            "provider",
+            "repeat_loads",
+            "schema_version",
+            "status",
+        )
+    } == {
         "all_slots_free": True,
         "buffer_capacity": 2,
         "buffer_high_water_mark": 1,
+        "io_binding_enabled": False,
         "processed_frames": 2,
         "provider": "CPUExecutionProvider",
         "repeat_loads": 3,
         "schema_version": "junctionlens.runtime-batch.v1",
         "status": "PASSED",
     }
+    for key in ("provider_assignment_sha256", "provider_log_sha256"):
+        assert len(receipt[key]) == 64
+        int(receipt[key], 16)
     session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
     actual_paths = sorted(output.glob("*.prediction.pb"))
     assert len(actual_paths) == 2
