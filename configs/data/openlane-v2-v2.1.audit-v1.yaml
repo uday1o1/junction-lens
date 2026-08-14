@@ -1,0 +1,32 @@
+schema_version: junctionlens.openlane-audit-policy.v1
+policy_id: openlane-v2-v2.1-audit-v1
+dataset_id: openlane-v2-v2.1
+dataset_version: "2.1"
+slice_registry:
+  path: ../slices/v1.yaml
+  sha256: 5d348097c4ae2415c51d337ae42f024d5415412a1be82ea975e9130e340477a4
+hard_geometry_range_m:
+  x: [-200.0, 200.0]
+  y: [-200.0, 200.0]
+  z: [-20.0, 50.0]
+canonical_bev_range_m:
+  x: [-20.0, 80.0]
+  y: [-40.0, 40.0]
+lane_curvature_buckets_per_m: [0.01, 0.05]
+control_pixel_area_buckets: [0.005, 0.02]
+lane_count_buckets: [8, 24]
+long_range_x_m: 50.0
+low_luminance_threshold: 0.2
+bev_render:
+  width: 800
+  height: 640
+frozen_frames:
+  - split_id: train
+    segment_id: "00492"
+    timestamp: "315970269249927220"
+  - split_id: train
+    segment_id: "00492"
+    timestamp: "315970277249927220"
+  - split_id: train
+    segment_id: "00556"
+    timestamp: "315969900049927216"

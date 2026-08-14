@@ -42,6 +42,8 @@ uv run --locked junctionlens data audit --profile sample
 uv run --locked junctionlens data verify-adapter --profile sample
 
 uv run --locked junctionlens data manifest --profile full
+
+uv run --locked junctionlens data visual-audit --profile sample
 ```
 
 Registration fails closed for a missing acknowledgment, checksum mismatch, missing manifest, changed root, or unsafe receipt path.
@@ -51,6 +53,7 @@ The adapter parity command compares the frozen sample selector with the pinned o
 It emits hashes and aggregate numeric error only, so restricted annotations do not become repository artifacts.
 The full-profile manifest command streams bounded provenance into the ignored content-addressed artifact store.
 The [data manifests and V1 splits](data-manifests-and-splits.md) workflow freezes the exact learning partitions without exposing annotation or image content.
+The [visual and statistical data audit](data-audit.md) writes licensed overlays only below the ignored artifact root and keeps its statistical report aggregate-only.
 
 ## Frozen normalization
 

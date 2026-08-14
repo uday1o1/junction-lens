@@ -32,6 +32,7 @@ Repository commands:
   test-integration-synthetic
   test-integration-data
   test-integration-splits
+  test-integration-audit
   test-web
   build-evaluator [--check-lock]
   test-evaluator
@@ -49,6 +50,7 @@ Repository commands:
   verify-m1-3
   verify-m2-1-local
   verify-m2-2-local
+  verify-m2-3-local
 EOF
 }
 
@@ -155,6 +157,12 @@ case "$JL_COMMAND" in
       "$JL_ROOT/tests/integration/test_split_cli.py" \
       "$@"
     ;;
+  test-integration-audit)
+    uv run --locked pytest \
+      "$JL_ROOT/tests/unit/test_visual_audit.py" \
+      "$JL_ROOT/tests/integration/test_visual_audit_cli.py" \
+      "$@"
+    ;;
   test-web)
     pnpm run typecheck:web
     pnpm run test:contract
@@ -244,6 +252,11 @@ case "$JL_COMMAND" in
     "$0" verify-m2-1-local
     "$0" verify-locks
     "$0" test-integration-splits
+    ;;
+  verify-m2-3-local)
+    "$0" verify-m2-2-local
+    "$0" verify-locks
+    "$0" test-integration-audit
     ;;
   -h|--help|help)
     usage

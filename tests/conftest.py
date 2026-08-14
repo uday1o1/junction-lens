@@ -56,8 +56,8 @@ def _metadata(root: Path, timestamp: int, pose_forward: float) -> None:
                     "distortion": [],
                 },
                 "extrinsic": {
-                    "rotation": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
-                    "translation": [0.0, 0.0, 0.0],
+                    "rotation": [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]],
+                    "translation": [0.0, 0.0, 0.2],
                 },
             }
         },

@@ -57,3 +57,20 @@ def test_split_policy_lock_rejects_seeded_config_hash_drift(tmp_path: Path) -> N
     dataset = verify._load_yaml(source_root / "configs/data/openlane-v2-v2.1.lock.yaml")
     with pytest.raises(verify.LockVerificationError, match="split policy differs"):
         verify._validate_split_policy_lock(tmp_path, dataset)
+
+
+def test_audit_policy_lock_rejects_seeded_slice_registry_drift(tmp_path: Path) -> None:
+    """Changed slice semantics cannot retain the V1 audit reproducibility identity."""
+    source_root = Path.cwd()
+    audit_relative = Path("configs/data/openlane-v2-v2.1.audit-v1.yaml")
+    slices_relative = Path("configs/slices/v1.yaml")
+    for relative in (audit_relative, slices_relative):
+        copied = tmp_path / relative
+        copied.parent.mkdir(parents=True, exist_ok=True)
+        copied.write_bytes((source_root / relative).read_bytes())
+    (tmp_path / slices_relative).write_bytes(
+        (source_root / slices_relative).read_bytes() + b"# drift\n"
+    )
+    dataset = verify._load_yaml(source_root / "configs/data/openlane-v2-v2.1.lock.yaml")
+    with pytest.raises(verify.LockVerificationError, match="slice registry differs"):
+        verify._validate_audit_policy_lock(tmp_path, dataset)

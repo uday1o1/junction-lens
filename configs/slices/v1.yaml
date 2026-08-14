@@ -1,0 +1,39 @@
+schema_version: junctionlens.slice-registry.v1
+registry_id: junctionlens-openlane-slices-v1
+slices:
+  - id: source_domain
+    provenance: authoritative-source-metadata
+    definition: normalized OpenLane source dataset identifier
+  - id: intersection_or_connector_presence
+    provenance: map-element-bucket-label
+    definition: any lane is marked as an intersection or connector
+  - id: merge_or_split_topology
+    provenance: map-element-bucket-topology
+    definition: maximum positive lane in-degree or out-degree is at least two
+  - id: lane_graph_degree_bucket
+    provenance: map-element-bucket-topology
+    definition: maximum positive lane in-degree or out-degree bucket
+  - id: lane_curvature_bucket
+    provenance: deterministic-ground-geometry
+    definition: maximum centerline heading change per meter bucket
+  - id: traffic_control_pixel_area_bucket
+    provenance: source-front-camera-box
+    definition: maximum normalized half-open traffic-control box area bucket
+  - id: long_range_projection_proxy
+    provenance: deterministic-ground-geometry
+    definition: any lane centerline point reaches the frozen forward-distance threshold
+  - id: crosswalk_presence
+    provenance: map-element-bucket-area-category
+    definition: any area has pedestrian-crossing category
+  - id: traffic_control_attribute_group
+    provenance: map-element-bucket-traffic-attribute
+    definition: observed attribute groups without invented occlusion semantics
+  - id: low_luminance_proxy
+    provenance: deterministic-front-camera-pixel-aggregate
+    definition: mean front-camera luminance is below the frozen threshold and is not labeled night
+  - id: camera_availability_pattern
+    provenance: authoritative-sensor-metadata
+    definition: canonical eight-slot Boolean availability pattern
+  - id: lane_count_complexity_bucket
+    provenance: map-element-bucket-label-count
+    definition: complete per-frame lane-count bucket without clipping

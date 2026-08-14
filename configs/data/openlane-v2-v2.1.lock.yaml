@@ -25,6 +25,10 @@ split_policy:
   config_sha256: be87e015986a3dbe1019a194b0b78030605b91c70dcd2e78e7cba639505f2401
   committed_manifest: configs/data/openlane-v2-v2.1.split-v1.json
   committed_manifest_sha256: null
+audit_policy:
+  version: v1
+  config_sha256: 452759880c083206dd54d80243359945d7a72510805bbf5b35cb8a3b7dc56810
+  slice_registry_sha256: 5d348097c4ae2415c51d337ae42f024d5415412a1be82ea975e9130e340477a4
 camera_slot_mappings:
   nuscenes:
     CAM_FRONT: FRONT_CENTER

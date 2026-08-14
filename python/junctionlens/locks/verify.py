@@ -187,6 +187,30 @@ def _validate_split_policy_lock(root: Path, dataset: Mapping[str, Any]) -> None:
         raise LockVerificationError("OpenLane committed split manifest differs from its lock")
 
 
+def _validate_audit_policy_lock(root: Path, dataset: Mapping[str, Any]) -> None:
+    audit_lock = dataset.get("audit_policy")
+    if not isinstance(audit_lock, dict) or set(audit_lock) != {
+        "config_sha256",
+        "slice_registry_sha256",
+        "version",
+    }:
+        raise LockVerificationError("dataset audit-policy lock is incomplete")
+    if audit_lock.get("version") != "v1":
+        raise LockVerificationError("dataset audit-policy version differs from V1")
+    for relative_path, lock_key, label in (
+        (
+            "configs/data/openlane-v2-v2.1.audit-v1.yaml",
+            "config_sha256",
+            "OpenLane audit policy",
+        ),
+        ("configs/slices/v1.yaml", "slice_registry_sha256", "OpenLane slice registry"),
+    ):
+        observed = hashlib.sha256((root / relative_path).read_bytes()).hexdigest()
+        expected = _require_hash(audit_lock.get(lock_key), _SHA256, f"{label} sha256")
+        if observed != expected:
+            raise LockVerificationError(f"{label} differs from its dataset lock")
+
+
 def _validate_images(payload: Mapping[str, Any]) -> None:
     if payload.get("platform") != "linux/amd64":
         raise LockVerificationError("image lock must target linux/amd64")
@@ -255,6 +279,7 @@ def validate_lock_set(root: Path) -> None:
     _validate_dataset(dataset)
     _validate_adapter_lock(root, dataset)
     _validate_split_policy_lock(root, dataset)
+    _validate_audit_policy_lock(root, dataset)
     _validate_images(_load_yaml(root / "containers/images.lock"))
     _cmake_sources(root / "cmake/dependencies.cmake")
 

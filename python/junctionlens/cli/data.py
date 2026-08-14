@@ -33,6 +33,11 @@ from junctionlens.data.manifests import (
 )
 from junctionlens.data.openlane import OpenLaneAdapter, OpenLaneAdapterError
 from junctionlens.data.parity import AdapterParityError, verify_official_parity
+from junctionlens.data.visual_audit import (
+    VisualAuditError,
+    load_audit_policy,
+    write_audit_bundle,
+)
 from junctionlens.evaluator.official import EvaluationError
 from junctionlens.registry import ContentAddressedStore, RegistryError
 from junctionlens.registry.store import canonical_json_bytes
@@ -418,3 +423,55 @@ def audit_splits_command(
             **asdict(audit),
         }
     )
+
+
+@data_app.command("visual-audit")
+def visual_audit_command(
+    dataset_id: Annotated[str, typer.Option("--dataset")] = "openlane-v2-v2.1",
+    profile: Annotated[str, typer.Option("--profile")] = "sample",
+    root: Annotated[
+        Path | None,
+        typer.Option("--root", exists=True, file_okay=False, resolve_path=True),
+    ] = None,
+    config_path: Annotated[
+        Path,
+        typer.Option("--config", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.adapter.yaml"),
+    policy_path: Annotated[
+        Path,
+        typer.Option("--policy", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.audit-v1.yaml"),
+    output_root: Annotated[
+        Path,
+        typer.Option("--output", file_okay=False, resolve_path=True),
+    ] = Path("artifacts/data-audit/openlane-v2-v2.1-sample"),
+) -> None:
+    """Create private calibration overlays, BEV labels, and aggregate data evidence."""
+    try:
+        selected_root = _registered_root(dataset_id, profile, root)
+        receipt = write_audit_bundle(
+            OpenLaneAdapter(selected_root, config_path),
+            profile,
+            load_audit_policy(policy_path),
+            output_root,
+        )
+    except (
+        DatasetRegistrationError,
+        OSError,
+        OpenLaneAdapterError,
+        TypeError,
+        ValueError,
+        VisualAuditError,
+        yaml.YAMLError,
+    ) as error:
+        _fail(error)
+        return
+    _emit(
+        {
+            "schema_version": "junctionlens.visual-audit-receipt.v1",
+            "state": "PENDING_HUMAN_INSPECTION",
+            **asdict(receipt),
+        }
+    )
+    if not receipt.range_gate_accepted:
+        raise typer.Exit(code=2)
