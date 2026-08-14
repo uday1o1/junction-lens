@@ -195,8 +195,7 @@ void ValidateTensorContract(const Ort::Session& session, const bool input) {
   return result;
 }
 
-void RequireMetadata(const std::map<std::string, std::string>& metadata,
-                     const std::string_view key,
+void RequireMetadata(const std::map<std::string, std::string>& metadata, const std::string_view key,
                      const std::string_view expected) {
   const auto found = metadata.find(std::string(key));
   if (found == metadata.end()) {
@@ -275,8 +274,7 @@ struct Inputs {
       for (std::int64_t column = 0; column < 640; ++column) {
         result.images[FlatIndex(image_shape, {0, 1, camera, 0, row, column})] = bit_value;
         result.images[FlatIndex(image_shape, {0, 1, camera, 1, row, column})] = 1.0F - bit_value;
-        result.images[FlatIndex(image_shape, {0, 0, camera, 2, row, column})] =
-            bit_value * 0.5F;
+        result.images[FlatIndex(image_shape, {0, 0, camera, 2, row, column})] = bit_value * 0.5F;
       }
     }
     for (std::int64_t timestamp = 0; timestamp < 2; ++timestamp) {
@@ -300,22 +298,16 @@ struct Inputs {
 }
 
 template <typename Element>
-[[nodiscard]] Ort::Value MakeTensor(Ort::MemoryInfo& memory,
-                                    std::vector<Element>& values,
+[[nodiscard]] Ort::Value MakeTensor(Ort::MemoryInfo& memory, std::vector<Element>& values,
                                     const std::vector<std::int64_t>& shape) {
-  return Ort::Value::CreateTensor<Element>(
-      memory, values.data(), values.size(), shape.data(), shape.size());
+  return Ort::Value::CreateTensor<Element>(memory, values.data(), values.size(), shape.data(),
+                                           shape.size());
 }
 
-[[nodiscard]] Ort::Value MakeBoolTensor(Ort::MemoryInfo& memory,
-                                        std::vector<std::uint8_t>& values,
+[[nodiscard]] Ort::Value MakeBoolTensor(Ort::MemoryInfo& memory, std::vector<std::uint8_t>& values,
                                         const std::vector<std::int64_t>& shape) {
-  return Ort::Value::CreateTensor(memory,
-                                  values.data(),
-                                  values.size() * sizeof(std::uint8_t),
-                                  shape.data(),
-                                  shape.size(),
-                                  ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL);
+  return Ort::Value::CreateTensor(memory, values.data(), values.size() * sizeof(std::uint8_t),
+                                  shape.data(), shape.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL);
 }
 
 void WriteStringArray(const std::vector<std::string>& values) {
@@ -410,12 +402,9 @@ int Run(const Arguments& arguments) {
   for (const TensorSpec& spec : OutputSpecs()) {
     output_names.push_back(spec.name.data());
   }
-  const std::vector<Ort::Value> outputs = session.Run(Ort::RunOptions{nullptr},
-                                                       input_names.data(),
-                                                       input_values.data(),
-                                                       input_values.size(),
-                                                       output_names.data(),
-                                                       output_names.size());
+  const std::vector<Ort::Value> outputs =
+      session.Run(Ort::RunOptions{nullptr}, input_names.data(), input_values.data(),
+                  input_values.size(), output_names.data(), output_names.size());
   if (outputs.size() != OutputSpecs().size()) {
     throw std::runtime_error("runtime output count differs from the frozen contract");
   }
@@ -424,8 +413,7 @@ int Run(const Arguments& arguments) {
   std::cout << "\"runtime_version\":\"" << JsonEscape(Ort::GetVersionString()) << "\",";
   std::cout << "\"requested_provider\":\"CPUExecutionProvider\",\"available_providers\":";
   WriteStringArray(Ort::GetAvailableProviders());
-  std::cout << ",\"profile_sha256\":\"" << JsonEscape(arguments.expected_profile_sha256)
-            << "\",";
+  std::cout << ",\"profile_sha256\":\"" << JsonEscape(arguments.expected_profile_sha256) << "\",";
   WriteOutputs(outputs);
   std::cout << "}\n";
   return EXIT_SUCCESS;

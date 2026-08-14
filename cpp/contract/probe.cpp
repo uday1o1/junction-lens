@@ -29,9 +29,7 @@ namespace {
   return result;
 }
 
-void Usage() {
-  std::cout << "Usage: junctionlens-contract-probe --input FILE [--emit-json]\n";
-}
+void Usage() { std::cout << "Usage: junctionlens-contract-probe --input FILE [--emit-json]\n"; }
 
 }  // namespace
 
@@ -81,8 +79,9 @@ int main(int argc, char** argv) {
   }
   const auto& graph = envelope.graph();
   std::cout << "{\"edges\":" << graph.edges_size() << ",\"lanes\":" << graph.lanes_size()
-            << ",\"road_areas\":" << graph.road_areas_size() << ",\"schema_major\":"
-            << envelope.schema_major() << ",\"schema_minor\":" << envelope.schema_minor()
+            << ",\"road_areas\":" << graph.road_areas_size()
+            << ",\"schema_major\":" << envelope.schema_major()
+            << ",\"schema_minor\":" << envelope.schema_minor()
             << ",\"traffic_controls\":" << graph.traffic_controls_size() << "}\n";
   return 0;
 }

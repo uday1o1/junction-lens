@@ -122,12 +122,14 @@ def project_vehicle_points(
     t_vehicle_camera: object,
 ) -> tuple[FloatArray, npt.NDArray[np.bool_]]:
     """Project vehicle-frame points and return image pixels plus positive-depth mask."""
+    calibration = _finite_array(intrinsic, (3, 3), "intrinsic")
+    if abs(float(np.linalg.det(calibration))) <= 1e-12:
+        raise GeometryError("intrinsic matrix is singular")
     points = np.asarray(points_vehicle, dtype=np.float64)
     camera_points = transform_points(invert_transform(t_vehicle_camera), points)
     valid = camera_points[:, 2] > 0.0
     pixels = np.full((len(camera_points), 2), np.nan, dtype=np.float64)
     if bool(valid.any()):
-        calibration = _finite_array(intrinsic, (3, 3), "intrinsic")
         projected = (calibration @ camera_points[valid].T).T
         pixels[valid] = projected[:, :2] / projected[:, 2:3]
     return pixels, valid
@@ -145,6 +147,8 @@ def backproject_pixels_to_plane(
     if pixel_array.ndim != 2 or pixel_array.shape[1] != 2 or not np.isfinite(pixel_array).all():
         raise GeometryError("pixels must be a finite N by 2 array")
     calibration = _finite_array(intrinsic, (3, 3), "intrinsic")
+    if not math.isfinite(plane_z) or abs(float(np.linalg.det(calibration))) <= 1e-12:
+        raise GeometryError("plane height must be finite and the intrinsic matrix nonsingular")
     transform = validate_transform(t_vehicle_camera, label="t_vehicle_camera")
     camera_rays = (
         np.linalg.inv(calibration)
@@ -182,6 +186,81 @@ def letterbox_transform(
     )
 
 
+def image_transform(
+    scale_x: float,
+    scale_y: float,
+    *,
+    crop_left: float = 0.0,
+    crop_top: float = 0.0,
+    pad_left: float = 0.0,
+    pad_top: float = 0.0,
+) -> FloatArray:
+    """Map original pixels through resize, then crop, then padding."""
+    values = (scale_x, scale_y, crop_left, crop_top, pad_left, pad_top)
+    if not all(math.isfinite(value) for value in values) or scale_x <= 0.0 or scale_y <= 0.0:
+        raise GeometryError("image transform values must be finite with positive scales")
+    return np.asarray(
+        [
+            [scale_x, 0.0, pad_left - crop_left],
+            [0.0, scale_y, pad_top - crop_top],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+
+
+def align_points_between_vehicle_frames(
+    points_previous: object,
+    t_world_previous_vehicle: object,
+    t_world_current_vehicle: object,
+) -> FloatArray:
+    """Align previous-vehicle points into the current vehicle frame through world coordinates."""
+    t_current_previous = compose_transforms(
+        invert_transform(t_world_current_vehicle),
+        t_world_previous_vehicle,
+    )
+    return transform_points(t_current_previous, points_previous)
+
+
+def validate_lane_boundary_orientation(
+    centerline: object,
+    left_boundary: object,
+    right_boundary: object,
+) -> None:
+    """Reject boundaries that are not left and right in legal travel direction."""
+    center = np.asarray(centerline, dtype=np.float64)
+    left = np.asarray(left_boundary, dtype=np.float64)
+    right = np.asarray(right_boundary, dtype=np.float64)
+    if center.shape != left.shape or center.shape != right.shape or center.ndim != 2:
+        raise GeometryError("centerline and boundaries must have the same N by 3 shape")
+    if center.shape[0] < 2 or center.shape[1] != 3:
+        raise GeometryError("lane polylines require at least two 3D points")
+    if not np.isfinite(center).all() or not np.isfinite(left).all() or not np.isfinite(right).all():
+        raise GeometryError("lane polylines contain a nonfinite value")
+    tangents = np.diff(center[:, :2], axis=0)
+    tangent_lengths = np.linalg.norm(tangents, axis=1)
+    if np.any(tangent_lengths <= 0.0):
+        raise GeometryError("centerline travel direction contains a zero-length segment")
+    tangents /= tangent_lengths[:, None]
+    left_offsets = ((left[:-1, :2] + left[1:, :2]) - (center[:-1, :2] + center[1:, :2])) / 2.0
+    right_offsets = ((right[:-1, :2] + right[1:, :2]) - (center[:-1, :2] + center[1:, :2])) / 2.0
+    left_cross = tangents[:, 0] * left_offsets[:, 1] - tangents[:, 1] * left_offsets[:, 0]
+    right_cross = tangents[:, 0] * right_offsets[:, 1] - tangents[:, 1] * right_offsets[:, 0]
+    if np.any(left_cross <= 0.0) or np.any(right_cross >= 0.0):
+        raise GeometryError("lane boundaries violate the left/right travel-direction convention")
+
+
+def validate_strictly_increasing_timestamps(timestamps_ns: Sequence[int]) -> None:
+    """Reject negative, duplicate, or nonincreasing timestamp sequences."""
+    if not timestamps_ns:
+        raise GeometryError("timestamp sequence must not be empty")
+    previous = -1
+    for timestamp in timestamps_ns:
+        if timestamp < 0 or timestamp <= previous:
+            raise GeometryError("timestamps must be nonnegative and strictly increasing")
+        previous = timestamp
+
+
 def transform_box(box: Sequence[float], homography: object) -> tuple[float, float, float, float]:
     """Transform a continuous half-open axis-aligned box."""
     if len(box) != 4:
@@ -192,14 +271,26 @@ def transform_box(box: Sequence[float], homography: object) -> tuple[float, floa
     if u_min > u_max or v_min > v_max:
         raise GeometryError("box minima cannot exceed maxima")
     matrix = _finite_array(homography, (3, 3), "image_homography")
-    corners = np.asarray([[u_min, v_min, 1.0], [u_max, v_max, 1.0]], dtype=np.float64)
+    corners = np.asarray(
+        [
+            [u_min, v_min, 1.0],
+            [u_min, v_max, 1.0],
+            [u_max, v_min, 1.0],
+            [u_max, v_max, 1.0],
+        ],
+        dtype=np.float64,
+    )
     transformed = (matrix @ corners.T).T
+    if np.any(np.abs(transformed[:, 2]) < 1e-12):
+        raise GeometryError("box transform has a zero homogeneous coordinate")
     transformed = transformed[:, :2] / transformed[:, 2:3]
+    if not np.isfinite(transformed).all():
+        raise GeometryError("box transform produced a nonfinite coordinate")
     return (
-        float(transformed[0, 0]),
-        float(transformed[0, 1]),
-        float(transformed[1, 0]),
-        float(transformed[1, 1]),
+        float(transformed[:, 0].min()),
+        float(transformed[:, 1].min()),
+        float(transformed[:, 0].max()),
+        float(transformed[:, 1].max()),
     )
 
 
@@ -241,6 +332,8 @@ def half_open_iou(first: Sequence[float], second: Sequence[float]) -> float:
     """Compute continuous IoU for half-open boxes, including border-touching boxes."""
     a_u0, a_v0, a_u1, a_v1 = (float(value) for value in first)
     b_u0, b_v0, b_u1, b_v1 = (float(value) for value in second)
+    if not all(math.isfinite(value) for value in (a_u0, a_v0, a_u1, a_v1, b_u0, b_v0, b_u1, b_v1)):
+        raise GeometryError("box coordinates must be finite")
     if min(a_u1 - a_u0, a_v1 - a_v0, b_u1 - b_u0, b_v1 - b_v0) < 0.0:
         raise GeometryError("box minima cannot exceed maxima")
     intersection_width = max(0.0, min(a_u1, b_u1) - max(a_u0, b_u0))

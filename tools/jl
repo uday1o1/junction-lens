@@ -14,12 +14,16 @@ Usage: ./tools/jl <command>
 Repository commands:
   bootstrap-cpu
   configure-cpu
+  configure-sanitizers
   build-cpu
+  build-sanitizers
   doctor
+  format-cpp-check
   format-check
   lint
   typecheck
   test-cpp
+  test-sanitizers
   test-python
   test-contract
   generate-bindings
@@ -36,6 +40,7 @@ Repository commands:
   model-benchmark
   verify-m0-3-local
   verify-m1-1
+  verify-m1-2
 EOF
 }
 
@@ -54,14 +59,33 @@ case "$JL_COMMAND" in
   configure-cpu)
     cmake --preset cpu "$@"
     ;;
+  configure-sanitizers)
+    cmake --preset sanitizers "$@"
+    ;;
   build-cpu)
     cmake --build --preset cpu "$@"
+    ;;
+  build-sanitizers)
+    cmake --build --preset sanitizers "$@"
     ;;
   doctor)
     uv run --locked junctionlens doctor "$@"
     ;;
+  format-cpp-check)
+    if command -v clang-format >/dev/null 2>&1; then
+      JL_CLANG_FORMAT=$(command -v clang-format)
+    elif command -v xcrun >/dev/null 2>&1 && xcrun --find clang-format >/dev/null 2>&1; then
+      JL_CLANG_FORMAT=$(xcrun --find clang-format)
+    else
+      echo "clang-format is required for the native formatting gate" >&2
+      exit 2
+    fi
+    find "$JL_ROOT/cpp" -type f \( -name '*.cpp' -o -name '*.hpp' \) \
+      -exec "$JL_CLANG_FORMAT" --dry-run --Werror {} +
+    ;;
   format-check)
     uv run --locked ruff format --check python tests scripts containers/evaluator_runner.py
+    "$0" format-cpp-check
     pnpm run format:check
     ;;
   lint)
@@ -72,6 +96,9 @@ case "$JL_COMMAND" in
     ;;
   test-cpp)
     ctest --preset cpu "$@"
+    ;;
+  test-sanitizers)
+    ctest --preset sanitizers "$@"
     ;;
   test-python)
     uv run --locked pytest "$@"
@@ -150,6 +177,12 @@ case "$JL_COMMAND" in
     "$0" test-python
     "$0" test-web
     junctionlens contract validate --input "$JL_ROOT/tests/fixtures/contract/v1/golden.pb"
+    ;;
+  verify-m1-2)
+    "$0" verify-m1-1
+    "$0" configure-sanitizers
+    "$0" build-sanitizers
+    "$0" test-sanitizers
     ;;
   -h|--help|help)
     usage

@@ -6,8 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-include(cmake/dependencies.cmake)
 include(CTest)
+include(cmake/dependencies.cmake)
+include(cmake/sanitizers.cmake)
 
 add_executable(junctionlens-toolchain-probe cpp/tools/toolchain_probe.cpp)
 
@@ -56,6 +57,12 @@ target_link_libraries(junctionlens_contract PUBLIC junctionlens_contract_proto)
 add_executable(junctionlens-contract-probe cpp/contract/probe.cpp)
 target_link_libraries(junctionlens-contract-probe PRIVATE junctionlens::contract)
 
+add_library(junctionlens_geometry STATIC cpp/src/geometry/geometry.cpp)
+add_library(junctionlens::geometry ALIAS junctionlens_geometry)
+target_include_directories(junctionlens_geometry PUBLIC "${PROJECT_SOURCE_DIR}/cpp/include")
+target_link_libraries(junctionlens_geometry PUBLIC Eigen3::Eigen)
+junctionlens_enable_sanitizers(junctionlens_geometry)
+
 if(NOT TARGET onnxruntime::onnxruntime)
   message(
     FATAL_ERROR
@@ -77,6 +84,7 @@ if(MSVC)
   target_compile_options(junctionlens-onnx-probe PRIVATE /W4 /WX)
   target_compile_options(junctionlens_contract PRIVATE /W4 /WX)
   target_compile_options(junctionlens-contract-probe PRIVATE /W4 /WX)
+  target_compile_options(junctionlens_geometry PRIVATE /W4 /WX)
 else()
   set(
     JUNCTIONLENS_WARNING_OPTIONS
@@ -91,6 +99,7 @@ else()
   target_compile_options(junctionlens-onnx-probe PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   target_compile_options(junctionlens_contract PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   target_compile_options(junctionlens-contract-probe PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
+  target_compile_options(junctionlens_geometry PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
   if(APPLE)
     set(JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS -Wno-gcc-compat -Wno-nullability-extension)
     target_compile_options(junctionlens_contract PRIVATE ${JUNCTIONLENS_APPLE_THIRD_PARTY_WARNINGS})
@@ -107,6 +116,16 @@ if(BUILD_TESTING)
     COMMAND junctionlens-contract-probe
       --input "${PROJECT_SOURCE_DIR}/tests/fixtures/contract/v1/golden.pb"
   )
+  add_executable(junctionlens-geometry-tests cpp/tests/geometry/geometry_test.cpp)
+  target_link_libraries(junctionlens-geometry-tests PRIVATE junctionlens::geometry GTest::gtest_main)
+  junctionlens_enable_sanitizers(junctionlens-geometry-tests)
+  if(MSVC)
+    target_compile_options(junctionlens-geometry-tests PRIVATE /W4 /WX)
+  else()
+    target_compile_options(junctionlens-geometry-tests PRIVATE ${JUNCTIONLENS_WARNING_OPTIONS})
+  endif()
+  include(GoogleTest)
+  gtest_discover_tests(junctionlens-geometry-tests TEST_PREFIX geometry.)
   set_tests_properties(
     toolchain-probe-json
     PROPERTIES

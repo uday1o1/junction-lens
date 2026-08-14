@@ -64,6 +64,7 @@ FetchContent_Declare(
   URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
   URL_HASH SHA256=8586084f71f9bde545ee7fa6d00288b264a2b7ac3607b974e54d13e7162c1c72
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  EXCLUDE_FROM_ALL
 )
 FetchContent_Declare(
   junctionlens_opencv
@@ -82,6 +83,7 @@ FetchContent_Declare(
   URL https://github.com/google/googletest/archive/refs/tags/v1.16.0.tar.gz
   URL_HASH SHA256=78c676fc63881529bf97bf9d45948d905a66833fbfa5318ea2cd7478cb98f399
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  EXCLUDE_FROM_ALL
 )
 FetchContent_Declare(
   junctionlens_rapidcheck
@@ -89,6 +91,29 @@ FetchContent_Declare(
   URL_HASH SHA256=7ff6fb341db865f4e8e451582627f854f24c8e4d3d7301bd6c6e4ff16f885ba1
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
+
+set(EIGEN_BUILD_DOC OFF CACHE BOOL "" FORCE)
+set(_junctionlens_build_testing "${BUILD_TESTING}")
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(junctionlens_eigen)
+# Eigen does not rewrite its generated CTest registry when BUILD_TESTING changes
+# from ON to OFF in an existing build tree. Remove that stale generated file so
+# CTest cannot discover excluded third-party tests after an incremental configure.
+file(REMOVE "${junctionlens_eigen_BINARY_DIR}/CTestTestfile.cmake")
+get_target_property(_junctionlens_eigen_includes eigen INTERFACE_INCLUDE_DIRECTORIES)
+set_property(
+  TARGET eigen
+  PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_junctionlens_eigen_includes}"
+)
+unset(_junctionlens_eigen_includes)
+set(BUILD_TESTING "${_junctionlens_build_testing}" CACHE BOOL "" FORCE)
+unset(_junctionlens_build_testing)
+
+if(BUILD_TESTING)
+  set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+  set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(junctionlens_googletest)
+endif()
 
 # The ONNX Runtime archive is locked for source identity and audit only.
 # A build must use the exact Git commit and verify every submodule in containers/images.lock.

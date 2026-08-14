@@ -26,18 +26,12 @@ using Envelope = v1::SceneControlGraphEnvelope;
 
 [[nodiscard]] ValidationResult Pass() { return {true, "OK", "", ""}; }
 
-[[nodiscard]] ValidationResult Fail(
-    std::string reason_code,
-    std::string path,
-    std::string detail
-) {
+[[nodiscard]] ValidationResult Fail(std::string reason_code, std::string path, std::string detail) {
   return {false, std::move(reason_code), std::move(path), std::move(detail)};
 }
 
-[[nodiscard]] ValidationResult ValidateFinite(
-    const google::protobuf::Message& message,
-    const std::string& path
-) {
+[[nodiscard]] ValidationResult ValidateFinite(const google::protobuf::Message& message,
+                                              const std::string& path) {
   const auto* reflection = message.GetReflection();
   std::vector<const google::protobuf::FieldDescriptor*> fields;
   reflection->ListFields(message, &fields);
@@ -45,27 +39,27 @@ using Envelope = v1::SceneControlGraphEnvelope;
     const int count = field->is_repeated() ? reflection->FieldSize(message, field) : 1;
     for (int index = 0; index < count; ++index) {
       const std::string field_name(field->name().data(), field->name().size());
-      const std::string field_path = path + "." + field_name
-          + (field->is_repeated() ? "[" + std::to_string(index) + "]" : "");
+      const std::string field_path =
+          path + "." + field_name + (field->is_repeated() ? "[" + std::to_string(index) + "]" : "");
       if (field->cpp_type() == google::protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
         const auto& child = field->is_repeated()
-            ? reflection->GetRepeatedMessage(message, field, index)
-            : reflection->GetMessage(message, field);
+                                ? reflection->GetRepeatedMessage(message, field, index)
+                                : reflection->GetMessage(message, field);
         auto result = ValidateFinite(child, field_path);
         if (!result.valid) {
           return result;
         }
       } else if (field->cpp_type() == google::protobuf::FieldDescriptor::CPPTYPE_DOUBLE) {
         const double value = field->is_repeated()
-            ? reflection->GetRepeatedDouble(message, field, index)
-            : reflection->GetDouble(message, field);
+                                 ? reflection->GetRepeatedDouble(message, field, index)
+                                 : reflection->GetDouble(message, field);
         if (!std::isfinite(value)) {
           return Fail("CONTRACT_NONFINITE", field_path, "floating-point values must be finite");
         }
       } else if (field->cpp_type() == google::protobuf::FieldDescriptor::CPPTYPE_FLOAT) {
         const float value = field->is_repeated()
-            ? reflection->GetRepeatedFloat(message, field, index)
-            : reflection->GetFloat(message, field);
+                                ? reflection->GetRepeatedFloat(message, field, index)
+                                : reflection->GetFloat(message, field);
         if (!std::isfinite(value)) {
           return Fail("CONTRACT_NONFINITE", field_path, "floating-point values must be finite");
         }
@@ -75,10 +69,8 @@ using Envelope = v1::SceneControlGraphEnvelope;
   return Pass();
 }
 
-[[nodiscard]] ValidationResult ValidateTransform(
-    const v1::Matrix4d& transform,
-    const std::string& path
-) {
+[[nodiscard]] ValidationResult ValidateTransform(const v1::Matrix4d& transform,
+                                                 const std::string& path) {
   if (transform.values_size() != 16) {
     return Fail("CONTRACT_TRANSFORM_SHAPE", path, "matrix requires exactly 16 values");
   }
@@ -92,8 +84,7 @@ using Envelope = v1::SceneControlGraphEnvelope;
     for (int column = 0; column < 3; ++column) {
       double dot = 0.0;
       for (int coordinate = 0; coordinate < 3; ++coordinate) {
-        dot += transform.values(row * 4 + coordinate)
-            * transform.values(column * 4 + coordinate);
+        dot += transform.values(row * 4 + coordinate) * transform.values(column * 4 + coordinate);
       }
       const double target = row == column ? 1.0 : 0.0;
       if (std::abs(dot - target) > 1.0e-6) {
@@ -110,9 +101,9 @@ using Envelope = v1::SceneControlGraphEnvelope;
 
 [[nodiscard]] ValidationResult ValidateNodes(
     const v1::SceneControlGraph& graph,
-    std::unordered_map<std::uint64_t, v1::NodeType>& node_types
-) {
-  const auto add_node = [&](std::uint64_t node_id, v1::NodeType node_type, const std::string& path) {
+    std::unordered_map<std::uint64_t, v1::NodeType>& node_types) {
+  const auto add_node = [&](std::uint64_t node_id, v1::NodeType node_type,
+                            const std::string& path) {
     if (node_id == 0U) {
       return Fail("CONTRACT_NODE_ID_ZERO", path, "node ID must be nonzero");
     }
@@ -125,11 +116,8 @@ using Envelope = v1::SceneControlGraphEnvelope;
     return Pass();
   };
   for (int index = 0; index < graph.lanes_size(); ++index) {
-    auto result = add_node(
-        graph.lanes(index).node_id(),
-        v1::NODE_TYPE_LANE_SEGMENT,
-        "graph.lanes[" + std::to_string(index) + "].node_id"
-    );
+    auto result = add_node(graph.lanes(index).node_id(), v1::NODE_TYPE_LANE_SEGMENT,
+                           "graph.lanes[" + std::to_string(index) + "].node_id");
     if (!result.valid) {
       return result;
     }
@@ -142,21 +130,15 @@ using Envelope = v1::SceneControlGraphEnvelope;
       return result;
     }
     const auto& box = control.normalized_half_open_box();
-    if (!(box.x_min() >= 0.0 && box.x_min() < box.x_max() && box.x_max() <= 1.0
-          && box.y_min() >= 0.0 && box.y_min() < box.y_max() && box.y_max() <= 1.0)) {
-      return Fail(
-          "CONTRACT_NORMALIZED_BOX",
-          path + ".normalized_half_open_box",
-          "half-open box must have positive area inside [0, 1]"
-      );
+    if (!(box.x_min() >= 0.0 && box.x_min() < box.x_max() && box.x_max() <= 1.0 &&
+          box.y_min() >= 0.0 && box.y_min() < box.y_max() && box.y_max() <= 1.0)) {
+      return Fail("CONTRACT_NORMALIZED_BOX", path + ".normalized_half_open_box",
+                  "half-open box must have positive area inside [0, 1]");
     }
   }
   for (int index = 0; index < graph.road_areas_size(); ++index) {
-    auto result = add_node(
-        graph.road_areas(index).node_id(),
-        v1::NODE_TYPE_ROAD_AREA,
-        "graph.road_areas[" + std::to_string(index) + "].node_id"
-    );
+    auto result = add_node(graph.road_areas(index).node_id(), v1::NODE_TYPE_ROAD_AREA,
+                           "graph.road_areas[" + std::to_string(index) + "].node_id");
     if (!result.valid) {
       return result;
     }
@@ -166,8 +148,7 @@ using Envelope = v1::SceneControlGraphEnvelope;
 
 [[nodiscard]] ValidationResult ValidateEdges(
     const v1::SceneControlGraph& graph,
-    const std::unordered_map<std::uint64_t, v1::NodeType>& node_types
-) {
+    const std::unordered_map<std::uint64_t, v1::NodeType>& node_types) {
   std::set<std::uint64_t> edge_ids;
   for (int index = 0; index < graph.edges_size(); ++index) {
     const auto& edge = graph.edges(index);
@@ -183,12 +164,12 @@ using Envelope = v1::SceneControlGraphEnvelope;
     if (source == node_types.end() || target == node_types.end()) {
       return Fail("CONTRACT_EDGE_DANGLING", path, "edge endpoint does not exist");
     }
-    const bool lane_successor = edge.edge_type() == v1::GRAPH_EDGE_TYPE_LANE_SUCCESSOR
-        && source->second == v1::NODE_TYPE_LANE_SEGMENT
-        && target->second == v1::NODE_TYPE_LANE_SEGMENT;
-    const bool control_lane = edge.edge_type() == v1::GRAPH_EDGE_TYPE_CONTROL_APPLIES_TO_LANE
-        && source->second == v1::NODE_TYPE_TRAFFIC_CONTROL
-        && target->second == v1::NODE_TYPE_LANE_SEGMENT;
+    const bool lane_successor = edge.edge_type() == v1::GRAPH_EDGE_TYPE_LANE_SUCCESSOR &&
+                                source->second == v1::NODE_TYPE_LANE_SEGMENT &&
+                                target->second == v1::NODE_TYPE_LANE_SEGMENT;
+    const bool control_lane = edge.edge_type() == v1::GRAPH_EDGE_TYPE_CONTROL_APPLIES_TO_LANE &&
+                              source->second == v1::NODE_TYPE_TRAFFIC_CONTROL &&
+                              target->second == v1::NODE_TYPE_LANE_SEGMENT;
     if (!lane_successor && !control_lane) {
       return Fail("CONTRACT_EDGE_TYPES", path, "edge endpoint types do not match edge type");
     }
@@ -213,15 +194,15 @@ ValidationResult Validate(const Envelope& envelope) {
     return Fail("CONTRACT_ENUM_UNSPECIFIED", "graph.role", "graph role is required");
   }
   if (graph.has_sensor_frame()) {
-    result = ValidateTransform(graph.sensor_frame().t_world_vehicle(), "graph.sensor_frame.t_world_vehicle");
+    result = ValidateTransform(graph.sensor_frame().t_world_vehicle(),
+                               "graph.sensor_frame.t_world_vehicle");
     if (!result.valid) {
       return result;
     }
     for (int index = 0; index < graph.sensor_frame().cameras_size(); ++index) {
       result = ValidateTransform(
           graph.sensor_frame().cameras(index).t_vehicle_camera(),
-          "graph.sensor_frame.cameras[" + std::to_string(index) + "].t_vehicle_camera"
-      );
+          "graph.sensor_frame.cameras[" + std::to_string(index) + "].t_vehicle_camera");
       if (!result.valid) {
         return result;
       }
@@ -246,7 +227,8 @@ ValidationResult ParseFile(const std::filesystem::path& path, Envelope& envelope
     return Fail("CONTRACT_IO", "binary", "input size could not be determined");
   }
   const auto size = static_cast<std::uint64_t>(end);
-  if (size > kMaximumSerializedBytes || size > static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
+  if (size > kMaximumSerializedBytes ||
+      size > static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
     return Fail("CONTRACT_SIZE_LIMIT", "binary", "payload exceeds 67108864 bytes");
   }
   input.seekg(0, std::ios::beg);

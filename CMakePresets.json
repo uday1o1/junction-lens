@@ -16,18 +16,49 @@
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
+    },
+    {
+      "name": "sanitizers",
+      "displayName": "Clang ASan and UBSan geometry gate",
+      "inherits": "cpu",
+      "binaryDir": "${sourceDir}/build/sanitizers",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "JUNCTIONLENS_ENABLE_SANITIZERS": "ON"
+      }
     }
   ],
   "buildPresets": [
     {
       "name": "cpu",
       "configurePreset": "cpu"
+    },
+    {
+      "name": "sanitizers",
+      "configurePreset": "sanitizers",
+      "targets": ["junctionlens-geometry-tests"]
     }
   ],
   "testPresets": [
     {
       "name": "cpu",
       "configurePreset": "cpu",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "sanitizers",
+      "configurePreset": "sanitizers",
+      "filter": {
+        "include": {
+          "name": "^geometry\\."
+        }
+      },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
+        "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+      },
       "output": {
         "outputOnFailure": true
       }

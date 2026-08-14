@@ -1,0 +1,55 @@
+"""Calibrated geometry, curve, and deterministic assignment primitives."""
+
+from junctionlens.data.geometry import (
+    GeometryError,
+    align_points_between_vehicle_frames,
+    backproject_pixels_to_plane,
+    compose_transforms,
+    denormalize_half_open_box,
+    half_open_iou,
+    image_transform,
+    invert_transform,
+    letterbox_transform,
+    normalize_half_open_box,
+    project_vehicle_points,
+    rigid_transform,
+    transform_box,
+    transform_points,
+    validate_lane_boundary_orientation,
+    validate_strictly_increasing_timestamps,
+    validate_transform,
+)
+from junctionlens.geometry.curves import (
+    EndpointFeatures,
+    chamfer_distance,
+    discrete_frechet_distance,
+    endpoint_features,
+    resample_polyline,
+)
+from junctionlens.geometry.matching import deterministic_hungarian
+
+__all__ = [
+    "EndpointFeatures",
+    "GeometryError",
+    "align_points_between_vehicle_frames",
+    "backproject_pixels_to_plane",
+    "chamfer_distance",
+    "compose_transforms",
+    "denormalize_half_open_box",
+    "deterministic_hungarian",
+    "discrete_frechet_distance",
+    "endpoint_features",
+    "half_open_iou",
+    "image_transform",
+    "invert_transform",
+    "letterbox_transform",
+    "normalize_half_open_box",
+    "project_vehicle_points",
+    "resample_polyline",
+    "rigid_transform",
+    "transform_box",
+    "transform_points",
+    "validate_lane_boundary_orientation",
+    "validate_strictly_increasing_timestamps",
+    "validate_transform",
+]

@@ -19,10 +19,8 @@ struct ValidationResult {
 
 [[nodiscard]] ValidationResult Validate(const v1::SceneControlGraphEnvelope& envelope);
 
-[[nodiscard]] ValidationResult ParseFile(
-    const std::filesystem::path& path,
-    v1::SceneControlGraphEnvelope& envelope
-);
+[[nodiscard]] ValidationResult ParseFile(const std::filesystem::path& path,
+                                         v1::SceneControlGraphEnvelope& envelope);
 
 void VerifyExactProtobufRuntime();
 
