@@ -104,4 +104,67 @@ RatioResult StateFlipRate(const std::vector<bool>& states) {
   return SafeRatio(static_cast<double>(changes), static_cast<double>(states.size() - 1U));
 }
 
+double BinaryBrier(const std::vector<double>& probabilities,
+                   const std::vector<std::uint8_t>& outcomes) {
+  if (probabilities.empty() || probabilities.size() != outcomes.size()) {
+    throw std::invalid_argument("binary Brier populations must be nonempty and aligned");
+  }
+  double total = 0.0;
+  for (std::size_t index = 0U; index < probabilities.size(); ++index) {
+    const double probability = probabilities[index];
+    RequireFinite(probability, "probability");
+    if (probability < 0.0 || probability > 1.0 || outcomes[index] > 1U) {
+      throw std::invalid_argument("binary Brier observation is invalid");
+    }
+    const double difference = probability - static_cast<double>(outcomes[index]);
+    total += difference * difference;
+  }
+  return total / static_cast<double>(probabilities.size());
+}
+
+NllResult BinaryNll(const std::vector<double>& probabilities,
+                    const std::vector<std::uint8_t>& outcomes) {
+  constexpr double epsilon = 1.0e-7;
+  if (probabilities.empty() || probabilities.size() != outcomes.size()) {
+    throw std::invalid_argument("binary NLL populations must be nonempty and aligned");
+  }
+  double total = 0.0;
+  std::size_t saturation_count = 0U;
+  for (std::size_t index = 0U; index < probabilities.size(); ++index) {
+    const double probability = probabilities[index];
+    RequireFinite(probability, "probability");
+    if (probability < 0.0 || probability > 1.0 || outcomes[index] > 1U) {
+      throw std::invalid_argument("binary NLL observation is invalid");
+    }
+    saturation_count +=
+        static_cast<std::size_t>(probability < epsilon || probability > 1.0 - epsilon);
+    const double clipped = std::clamp(probability, epsilon, 1.0 - epsilon);
+    const double outcome = static_cast<double>(outcomes[index]);
+    total -= outcome * std::log(clipped) + (1.0 - outcome) * std::log(1.0 - clipped);
+  }
+  return NllResult{.value = total / static_cast<double>(probabilities.size()),
+                   .saturation_count = saturation_count};
+}
+
+RatioResult MarginalLaplaceCoverage90(const std::vector<double>& residuals,
+                                      const std::vector<double>& scales,
+                                      const std::vector<double>& factors) {
+  if (residuals.empty() || residuals.size() != scales.size() ||
+      residuals.size() != factors.size()) {
+    throw std::invalid_argument("geometry uncertainty populations must be nonempty and aligned");
+  }
+  std::size_t covered = 0U;
+  for (std::size_t index = 0U; index < residuals.size(); ++index) {
+    RequireFinite(residuals[index], "residual");
+    RequireFinite(scales[index], "scale");
+    RequireFinite(factors[index], "factor");
+    if (scales[index] <= 0.0 || factors[index] <= 0.0) {
+      throw std::invalid_argument("geometry uncertainty scales and factors must be positive");
+    }
+    const double half_width = scales[index] * factors[index] * std::log(10.0);
+    covered += static_cast<std::size_t>(std::abs(residuals[index]) <= half_width);
+  }
+  return SafeRatio(static_cast<double>(covered), static_cast<double>(residuals.size()));
+}
+
 }  // namespace junctionlens::eval

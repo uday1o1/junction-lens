@@ -116,3 +116,57 @@ metrics:
     population: eligible source-identified ground-truth tracks with matched tracked predictions
     denominator: unique eligible ground-truth tracks
     missing: null_when_empty
+  brier_score:
+    direction: lower_is_better
+    unit: score
+    population: frozen CustomMatchV1 node or conditional edge calibration population
+    denominator: predicted items with defined outcomes
+    missing: null_when_empty
+  negative_log_likelihood:
+    direction: lower_is_better
+    unit: nat
+    population: frozen calibration population
+    denominator: predicted items with defined outcomes
+    missing: null_when_empty
+  adaptive_ece_15:
+    direction: lower_is_better
+    unit: ratio
+    population: frozen calibration population in deterministic equal-count bins
+    denominator: predicted items with defined outcomes
+    missing: null_when_empty
+  aurc:
+    direction: lower_is_better
+    unit: risk_coverage_area
+    population: frozen calibration population ordered by confidence and stable ID
+    denominator: predicted items with defined outcomes
+    missing: null_when_empty
+  geometry_coverage_90:
+    direction: target_is_better
+    unit: ratio
+    population: scalar point-coordinate residuals with calibrated Laplace scales
+    denominator: eligible scalar coordinates
+    missing: null_when_empty
+  geometry_interval_width_m_median:
+    direction: lower_is_better
+    unit: meter
+    population: marginal 90 percent Laplace intervals
+    denominator: eligible scalar coordinates
+    missing: null_when_empty
+  geometry_interval_width_m_p90:
+    direction: lower_is_better
+    unit: meter
+    population: marginal 90 percent Laplace intervals
+    denominator: eligible scalar coordinates
+    missing: null_when_empty
+  runtime_latency_ms:
+    direction: lower_is_better
+    unit: millisecond
+    population: measured non-warmup samples for one declared runtime phase
+    denominator: measured samples
+    missing: null_when_empty
+  runtime_throughput_per_second:
+    direction: higher_is_better
+    unit: items_per_second
+    population: measured non-warmup samples for one declared runtime phase
+    denominator: measured samples
+    missing: null_when_empty

@@ -14,6 +14,11 @@ from junctionlens.cli.model import model_app
 from junctionlens.cli.synthetic import synthetic_app
 from junctionlens.doctor.service import run_doctor
 from junctionlens.evaluator import EvaluationError, evaluate_custom, evaluate_official
+from junctionlens.evaluator.evidence import (
+    EvidenceError,
+    evaluate_calibration_file,
+    evaluate_runtime_file,
+)
 
 app = typer.Typer(
     name="junctionlens",
@@ -59,6 +64,22 @@ def doctor_command(
         raise typer.Exit(code=2)
 
 
+@app.command("calibrate")
+def calibrate_command(
+    input_path: Annotated[
+        Path,
+        typer.Option("--input", exists=True, dir_okay=False, resolve_path=True),
+    ],
+) -> None:
+    """Compute deterministic probability and geometry calibration evidence."""
+    try:
+        result = evaluate_calibration_file(input_path)
+    except (EvidenceError, OSError, ValueError) as error:
+        typer.echo(f"calibration error: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    typer.echo(json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False))
+
+
 @app.command("evaluate")
 def evaluate_command(
     input_path: Annotated[
@@ -77,6 +98,10 @@ def evaluate_command(
         Path | None,
         typer.Option("--artifact-root", file_okay=False, resolve_path=True),
     ] = None,
+    runtime_input: Annotated[
+        Path | None,
+        typer.Option("--runtime-input", exists=True, dir_okay=False, resolve_path=True),
+    ] = None,
     project_root: Annotated[
         Path,
         typer.Option(hidden=True, exists=True, file_okay=False, dir_okay=True, resolve_path=True),
@@ -85,7 +110,11 @@ def evaluate_command(
     """Compute official metrics or immutable custom graph and temporal KPIs."""
     try:
         custom_values = (ground_truth_root, prediction_root, artifact_root)
-        if any(value is not None for value in custom_values):
+        if runtime_input is not None:
+            if input_path is not None or any(value is not None for value in custom_values):
+                raise EvaluationError("runtime evaluation cannot be combined with other inputs")
+            result = evaluate_runtime_file(runtime_input)
+        elif any(value is not None for value in custom_values):
             if input_path is not None or any(value is None for value in custom_values):
                 raise EvaluationError(
                     "custom evaluation requires --ground-truth, --predictions, and "

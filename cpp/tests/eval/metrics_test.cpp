@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <sstream>
@@ -97,6 +98,20 @@ TEST(EvalMetrics, RejectsInvalidNumericInputs) {
   EXPECT_THROW((void)junctionlens::eval::SafeRatio(2.0, 1.0), std::invalid_argument);
   EXPECT_THROW((void)junctionlens::eval::LinearQuantile({}, 0.5), std::invalid_argument);
   EXPECT_FALSE(junctionlens::eval::StateFlipRate({true}).value.has_value());
+}
+
+TEST(EvalMetrics, CalibrationAndCoverageMatchAnalyticGoldens) {
+  const std::vector<double> probabilities{0.0, 0.25, 0.75, 1.0};
+  const std::vector<std::uint8_t> outcomes{0U, 0U, 1U, 1U};
+  EXPECT_DOUBLE_EQ(junctionlens::eval::BinaryBrier(probabilities, outcomes), 0.03125);
+  const auto nll = junctionlens::eval::BinaryNll(probabilities, outcomes);
+  EXPECT_EQ(nll.saturation_count, 2U);
+  const double expected_nll = (-2.0 * std::log(1.0 - 1.0e-7) - 2.0 * std::log(0.75)) / 4.0;
+  EXPECT_NEAR(nll.value, expected_nll, 1.0e-15);
+  const auto coverage = junctionlens::eval::MarginalLaplaceCoverage90(
+      {std::log(10.0), std::log(10.0) + 0.001}, {1.0, 1.0}, {1.0, 1.0});
+  ASSERT_TRUE(coverage.value.has_value());
+  EXPECT_DOUBLE_EQ(*coverage.value, 0.5);
 }
 
 }  // namespace

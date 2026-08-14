@@ -15,6 +15,11 @@ struct RatioResult {
   std::optional<double> value;
 };
 
+struct NllResult {
+  double value;
+  std::size_t saturation_count;
+};
+
 [[nodiscard]] RatioResult SafeRatio(double numerator, double denominator);
 
 [[nodiscard]] bool ReachableWithinHops(
@@ -27,5 +32,12 @@ struct RatioResult {
 [[nodiscard]] double LinearQuantile(std::vector<double> values, double probability);
 
 [[nodiscard]] RatioResult StateFlipRate(const std::vector<bool>& states);
+[[nodiscard]] double BinaryBrier(const std::vector<double>& probabilities,
+                                 const std::vector<std::uint8_t>& outcomes);
+[[nodiscard]] NllResult BinaryNll(const std::vector<double>& probabilities,
+                                  const std::vector<std::uint8_t>& outcomes);
+[[nodiscard]] RatioResult MarginalLaplaceCoverage90(const std::vector<double>& residuals,
+                                                    const std::vector<double>& scales,
+                                                    const std::vector<double>& factors);
 
 }  // namespace junctionlens::eval
