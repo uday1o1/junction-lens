@@ -1,0 +1,60 @@
+schema_version: junctionlens.e0-profile.v1
+experiment_id: E0-independent
+seeds: [20260813, 20260814, 20260815]
+input:
+  timestamps: 2
+  cameras: 8
+  channels: 3
+  height: 384
+  width: 640
+  current_timestamp_index: 1
+architecture:
+  backbone: efficientnet-b0
+  backbone_weights: random-initialization
+  feature_strides: [8, 16, 32]
+  feature_channels: [40, 112, 320]
+  fpn_channels: 128
+  bev_x_range_m: [-20.0, 80.0]
+  bev_y_range_m: [-40.0, 40.0]
+  bev_cell_size_m: 0.5
+  bev_shape: [200, 160]
+  decoder_memory_shape: [25, 20]
+  decoder_layers: 4
+  hidden_dimension: 256
+  attention_heads: 8
+  lane_queries: 96
+  traffic_queries: 64
+  area_queries: 32
+  lane_points: 11
+  area_points: 20
+  boundary_classes: 3
+  traffic_categories: 2
+  traffic_attributes: 13
+  area_categories: 2
+  track_embedding_dimension: 32
+training:
+  optimizer: AdamW
+  base_learning_rate: 0.0002
+  backbone_learning_rate_multiplier: 0.1
+  weight_decay: 0.01
+  warmup_steps: 1000
+  minimum_learning_rate: 0.000002
+  maximum_epochs: 50
+  batch_size_per_gpu: 1
+  gradient_accumulation_steps: 8
+  gradient_clip_norm: 1.0
+  minimum_early_stopping_epoch: 20
+  early_stopping_patience: 8
+  mixed_precision_preference: [bf16, fp16, fp32]
+  training_partition: model_training
+  selection_partition: model_selection
+  forbidden_statistics_partitions: [model_selection, calibration, internal_holdout, external_diagnostic]
+independent_linker:
+  successor_distance_candidates_m: [1.0, 1.5, 2.0, 2.5, 3.0]
+  successor_heading_candidates_deg: [15.0, 25.0, 35.0, 45.0]
+  control_endpoint_distance_candidates_px: [20.0, 40.0, 60.0, 80.0, 120.0]
+  control_heading_candidates_deg: [20.0, 30.0, 45.0, 60.0]
+  fit_partition: model_training
+export:
+  opset: 18
+  precision: fp32

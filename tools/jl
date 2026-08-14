@@ -36,6 +36,7 @@ Repository commands:
   test-integration-evaluator
   test-integration-custom-kpis
   test-integration-evidence
+  test-integration-e0
   test-web
   build-evaluator [--check-lock]
   test-evaluator
@@ -57,6 +58,7 @@ Repository commands:
   verify-m3-1
   verify-m3-2
   verify-m3-3
+  verify-m4-1-local
 EOF
 }
 
@@ -190,6 +192,12 @@ case "$JL_COMMAND" in
       "$JL_ROOT/tests/integration/test_evidence_cli.py" \
       "$@"
     ;;
+  test-integration-e0)
+    uv run --locked pytest \
+      "$JL_ROOT/tests/unit/test_e0_baseline.py" \
+      "$JL_ROOT/tests/integration/test_e0_cli.py" \
+      "$@"
+    ;;
   test-web)
     pnpm run typecheck:web
     pnpm run test:contract
@@ -298,6 +306,10 @@ case "$JL_COMMAND" in
   verify-m3-3)
     "$0" verify-m3-2
     "$0" test-integration-evidence
+    ;;
+  verify-m4-1-local)
+    "$0" verify-m3-3
+    "$0" test-integration-e0
     ;;
   -h|--help|help)
     usage
