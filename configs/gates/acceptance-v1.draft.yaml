@@ -1,0 +1,150 @@
+schema_version: junctionlens.acceptance-charter-draft.v1
+charter_id: junctionlens-acceptance-v1
+family_alpha: 0.05
+bootstrap:
+  algorithm: paired-segment-cluster-bootstrap-v1
+  replicates: 10000
+  seed: 20260813
+  minimum_finite_replicates: 9900
+runtime_bootstrap:
+  algorithm: paired-trial-block-bootstrap-v1
+  replicates: 10000
+  seed: 20260813
+  minimum_valid_pairs: 8
+  balanced_order_schedule: [AB, BA, BA, AB, AB, BA, BA, AB, AB, BA]
+support:
+  overall_paired_segments: 200
+  gating_slice_paired_segments: 30
+  lane_control_ground_truth_edges: 500
+  temporal_adjacent_frame_transitions: 500
+  temporal_segments: 30
+absolute_runtime:
+  throughput_per_second_minimum: 10.0
+  p95_latency_ms_maximum: 100.0
+  p99_latency_ms_maximum: 125.0
+  peak_device_memory_bytes_maximum: 6442450944
+  long_run_frames: 10000
+  unexpected_cpu_provider_nodes_maximum: 0
+cells:
+  - id: overall.DET_l
+    metric: DET_l
+    slice: overall
+    direction: higher_is_better
+    margin: 0.01
+    support: overall
+    estimator: average_precision
+    stage: accuracy
+  - id: overall.DET_t
+    metric: DET_t
+    slice: overall
+    direction: higher_is_better
+    margin: 0.01
+    support: overall
+    estimator: average_precision
+    stage: accuracy
+  - id: overall.DET_a
+    metric: DET_a
+    slice: overall
+    direction: higher_is_better
+    margin: 0.01
+    support: overall
+    estimator: average_precision
+    stage: accuracy
+  - id: overall.TOP_ll
+    metric: TOP_ll
+    slice: overall
+    direction: higher_is_better
+    margin: 0.005
+    support: overall
+    estimator: average_precision
+    stage: accuracy
+  - id: overall.TOP_lt
+    metric: TOP_lt
+    slice: overall
+    direction: higher_is_better
+    margin: 0.005
+    support: overall
+    estimator: average_precision
+    stage: accuracy
+  - id: overall.control_edge_recall
+    metric: control_edge_recall
+    slice: overall
+    direction: higher_is_better
+    margin: 0.005
+    support: lane_control
+    estimator: ratio
+    stage: accuracy
+  - id: overall.wrong_control_assignment_rate
+    metric: wrong_control_assignment_rate
+    slice: overall
+    direction: lower_is_better
+    margin: 0.005
+    support: lane_control
+    estimator: ratio
+    stage: accuracy
+  - id: overall.reachability_recall_h3
+    metric: reachability_recall_h3
+    slice: overall
+    direction: higher_is_better
+    margin: 0.005
+    support: overall
+    estimator: ratio
+    stage: accuracy
+  - id: overall.path_blocking_rate_h3
+    metric: path_blocking_rate_h3
+    slice: overall
+    direction: lower_is_better
+    margin: 0.005
+    support: overall
+    estimator: ratio
+    stage: accuracy
+  - id: overall.adaptive_ece_15
+    metric: adaptive_ece_15
+    slice: overall
+    direction: lower_is_better
+    margin: 0.01
+    support: overall
+    estimator: adaptive_ece
+    stage: calibration
+  - id: runtime.p95_latency_ms
+    metric: runtime_p95_latency_ms
+    slice: overall
+    direction: lower_is_better
+    margin: 0.05
+    support: runtime
+    estimator: paired_runtime
+    stage: performance
+  - id: runtime.peak_device_memory_bytes
+    metric: peak_device_memory_bytes
+    slice: overall
+    direction: lower_is_better
+    margin: 0.05
+    support: runtime
+    estimator: paired_runtime
+    stage: performance
+  - id: argoverse2.TOP_lt
+    metric: TOP_lt
+    slice: source_domain:argoverse2
+    direction: higher_is_better
+    margin: 0.005
+    support: slice
+    estimator: average_precision
+    stage: accuracy
+  - id: nuscenes.TOP_lt
+    metric: TOP_lt
+    slice: source_domain:nuscenes
+    direction: higher_is_better
+    margin: 0.005
+    support: slice
+    estimator: average_precision
+    stage: accuracy
+primary_hypotheses:
+  - id: top_lt_superiority_vs_e0
+    cell_id: overall.TOP_lt
+    minimum_improvement: 0.01
+  - id: det_l_protection_vs_e0
+    cell_id: overall.DET_l
+    minimum_improvement: -0.01
+  - id: det_t_protection_vs_e0
+    cell_id: overall.DET_t
+    minimum_improvement: -0.01

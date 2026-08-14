@@ -8,6 +8,36 @@ policy:
   quantile_method: linear_type_7
   temporal_geometry_resample_points: 20
 metrics:
+  DET_l:
+    direction: higher_is_better
+    unit: average_precision
+    population: official OpenLane-V2 lane detection population
+    denominator: official evaluator definition
+    missing: invalid_when_unavailable
+  DET_t:
+    direction: higher_is_better
+    unit: average_precision
+    population: official OpenLane-V2 traffic-element detection population
+    denominator: official evaluator definition
+    missing: invalid_when_unavailable
+  DET_a:
+    direction: higher_is_better
+    unit: average_precision
+    population: official OpenLane-V2 area detection population
+    denominator: official evaluator definition
+    missing: invalid_when_unavailable
+  TOP_ll:
+    direction: higher_is_better
+    unit: average_precision
+    population: official OpenLane-V2 lane-lane topology population
+    denominator: official evaluator definition
+    missing: invalid_when_unavailable
+  TOP_lt:
+    direction: higher_is_better
+    unit: average_precision
+    population: official OpenLane-V2 lane-traffic topology population
+    denominator: official evaluator definition
+    missing: invalid_when_unavailable
   control_edge_precision:
     direction: higher_is_better
     unit: ratio

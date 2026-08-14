@@ -28,6 +28,7 @@
         "release_decision",
         "counterexample_bundle",
         "benchmark",
+        "baseline_freeze_evidence",
         "profiler_capture",
         "model_card",
         "evidence_report"
