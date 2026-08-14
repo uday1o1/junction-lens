@@ -308,6 +308,10 @@ def main() -> int:
     except (OSError, RuntimeError, ValueError) as error:
         print(f"CUDA parity error: {error}", file=sys.stderr)
         return 1
+    (arguments.output / "qualification.json").write_text(
+        json.dumps(report, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
     print(json.dumps(report, sort_keys=True, separators=(",", ":"), allow_nan=False))
     return 0
 

@@ -271,6 +271,11 @@ def _load_json_bytes(raw: bytes, label: str) -> Mapping[str, Any]:
 
 
 def _source_commit(project_root: Path) -> str:
+    override = os.environ.get("JUNCTIONLENS_SOURCE_COMMIT")
+    if override is not None and not (project_root / ".git").exists():
+        if _GIT_PATTERN.fullmatch(override) is None:
+            raise CharterError("verified source commit override is invalid")
+        return override
     git = shutil.which("git")
     if git is None:
         raise CharterError("git is required to freeze a charter")

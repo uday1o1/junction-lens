@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+from enum import StrEnum
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
 from junctionlens.cli.output import emit
 
 model_app = typer.Typer(help="Prove model training and deployment contracts.", no_args_is_help=True)
+
+
+class CheckpointExperiment(StrEnum):
+    """Public experiment identifiers accepted by checkpoint scoring."""
+
+    E0 = "E0-independent"
+    E1 = "E1-joint"
+
 
 ProfileOption = Annotated[
     Path,
@@ -375,6 +385,305 @@ def finalize_e1_study_command(
             output,
         )
     except (E1StudyError, OSError, TypeError, ValueError) as error:
+        _fail(error)
+        return
+    _print(result)
+
+
+@model_app.command("fit-e0-linker")
+def fit_e0_linker_command(
+    dataset_root: Annotated[
+        Path,
+        typer.Option("--dataset-root", exists=True, file_okay=False, resolve_path=True),
+    ],
+    split_manifest: Annotated[
+        Path,
+        typer.Option("--split-manifest", exists=True, dir_okay=False, resolve_path=True),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", dir_okay=False, resolve_path=True),
+    ],
+    profile_path: Annotated[
+        Path,
+        typer.Option("--profile", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/model/e0-independent-v1.yaml"),
+    adapter_config: Annotated[
+        Path,
+        typer.Option("--adapter-config", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.adapter.yaml"),
+    split_policy: Annotated[
+        Path,
+        typer.Option("--split-policy", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.split-v1.yaml"),
+) -> None:
+    """Fit the independent baseline topology rules on model-training labels only."""
+    from junctionlens.data.license import DatasetRegistrationError, load_registration
+    from junctionlens.data.manifests import ManifestError
+    from junctionlens.data.openlane import OpenLaneAdapter, OpenLaneAdapterError
+    from junctionlens.model.e0_data import E0DataError, load_partition_isolation
+    from junctionlens.model.e0_profile import load_e0_profile
+    from junctionlens.model.selection_evaluation import (
+        SelectionEvaluationError,
+        fit_e0_linker,
+    )
+
+    try:
+        project_root = Path.cwd().resolve()
+        registration = load_registration(project_root, "openlane-v2-v2.1", "full")
+        if Path(str(registration["root"])).resolve(strict=True) != dataset_root:
+            raise DatasetRegistrationError(
+                "E0 linker dataset root differs from the checksum-verified registration"
+            )
+        profile = load_e0_profile(profile_path)
+        artifact = fit_e0_linker(
+            profile,
+            OpenLaneAdapter(dataset_root, adapter_config),
+            load_partition_isolation(
+                split_manifest,
+                split_policy,
+                partition="model_training",
+                statistics=False,
+            ),
+            output,
+        )
+    except (
+        DatasetRegistrationError,
+        E0DataError,
+        ManifestError,
+        OpenLaneAdapterError,
+        OSError,
+        SelectionEvaluationError,
+        TypeError,
+        ValueError,
+    ) as error:
+        _fail(error)
+        return
+    _print({"state": "ACCEPTED", **asdict(artifact)})
+
+
+@model_app.command("score-checkpoints")
+def score_checkpoints_command(
+    experiment: Annotated[
+        CheckpointExperiment,
+        typer.Option("--experiment"),
+    ],
+    run_root: Annotated[
+        Path,
+        typer.Option("--run-root", exists=True, file_okay=False, resolve_path=True),
+    ],
+    dataset_root: Annotated[
+        Path,
+        typer.Option("--dataset-root", exists=True, file_okay=False, resolve_path=True),
+    ],
+    split_manifest: Annotated[
+        Path,
+        typer.Option("--split-manifest", exists=True, dir_okay=False, resolve_path=True),
+    ],
+    output_root: Annotated[
+        Path,
+        typer.Option("--output-root", file_okay=False, resolve_path=True),
+    ],
+    linker_path: Annotated[
+        Path | None,
+        typer.Option("--linker", exists=True, dir_okay=False, resolve_path=True),
+    ] = None,
+    base_profile_path: Annotated[
+        Path,
+        typer.Option("--base-profile", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/model/e0-independent-v1.yaml"),
+    e1_profile_path: Annotated[
+        Path,
+        typer.Option("--e1-profile", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/model/e1-joint-v1.yaml"),
+    adapter_config: Annotated[
+        Path,
+        typer.Option("--adapter-config", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.adapter.yaml"),
+    split_policy: Annotated[
+        Path,
+        typer.Option("--split-policy", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.split-v1.yaml"),
+    device: Annotated[str | None, typer.Option("--device")] = None,
+) -> None:
+    """Score all epochs on model-selection with official metrics and frozen NLL."""
+    from junctionlens.data.license import DatasetRegistrationError, load_registration
+    from junctionlens.data.manifests import ManifestError
+    from junctionlens.data.openlane import OpenLaneAdapter, OpenLaneAdapterError
+    from junctionlens.model.e0_data import E0DataError, load_partition_isolation
+    from junctionlens.model.e0_profile import load_e0_profile
+    from junctionlens.model.e1_profile import load_e1_profile
+    from junctionlens.model.selection_evaluation import (
+        SelectionEvaluationError,
+        load_e0_linker,
+        score_checkpoints,
+    )
+
+    try:
+        project_root = Path.cwd().resolve()
+        registration = load_registration(project_root, "openlane-v2-v2.1", "full")
+        if Path(str(registration["root"])).resolve(strict=True) != dataset_root:
+            raise DatasetRegistrationError(
+                "checkpoint scoring dataset differs from the checksum-verified registration"
+            )
+        base = load_e0_profile(base_profile_path)
+        isolation = load_partition_isolation(
+            split_manifest,
+            split_policy,
+            partition="model_selection",
+            statistics=False,
+        )
+        experiment_id: Literal["E0-independent", "E1-joint"] = (
+            "E0-independent" if experiment is CheckpointExperiment.E0 else "E1-joint"
+        )
+        if experiment_id == "E0-independent":
+            if linker_path is None:
+                raise SelectionEvaluationError("E0 checkpoint scoring requires --linker")
+            linker = load_e0_linker(linker_path, base, isolation.split_manifest_sha256)
+            e1 = None
+        else:
+            linker = None
+            e1 = load_e1_profile(e1_profile_path, base)
+        result = score_checkpoints(
+            experiment=experiment_id,
+            run_root=run_root,
+            adapter=OpenLaneAdapter(dataset_root, adapter_config),
+            isolation=isolation,
+            base_profile=base,
+            e1_profile=e1,
+            linker=linker,
+            project_root=project_root,
+            output_root=output_root,
+            device_name=device,
+        )
+    except (
+        DatasetRegistrationError,
+        E0DataError,
+        ManifestError,
+        OpenLaneAdapterError,
+        OSError,
+        RuntimeError,
+        SelectionEvaluationError,
+        TypeError,
+        ValueError,
+    ) as error:
+        _fail(error)
+        return
+    _print(result)
+
+
+@model_app.command("evaluate-selected")
+def evaluate_selected_command(
+    experiment: Annotated[
+        CheckpointExperiment,
+        typer.Option("--experiment"),
+    ],
+    run_root: Annotated[
+        Path,
+        typer.Option("--run-root", exists=True, file_okay=False, resolve_path=True),
+    ],
+    dataset_root: Annotated[
+        Path,
+        typer.Option("--dataset-root", exists=True, file_okay=False, resolve_path=True),
+    ],
+    split_manifest: Annotated[
+        Path,
+        typer.Option("--split-manifest", exists=True, dir_okay=False, resolve_path=True),
+    ],
+    artifact_root: Annotated[
+        Path,
+        typer.Option("--artifact-root", file_okay=False, resolve_path=True),
+    ],
+    output_root: Annotated[
+        Path,
+        typer.Option("--output-root", file_okay=False, resolve_path=True),
+    ],
+    linker_path: Annotated[
+        Path | None,
+        typer.Option("--linker", exists=True, dir_okay=False, resolve_path=True),
+    ] = None,
+    base_profile_path: Annotated[
+        Path,
+        typer.Option("--base-profile", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/model/e0-independent-v1.yaml"),
+    e1_profile_path: Annotated[
+        Path,
+        typer.Option("--e1-profile", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/model/e1-joint-v1.yaml"),
+    adapter_config: Annotated[
+        Path,
+        typer.Option("--adapter-config", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.adapter.yaml"),
+    split_policy: Annotated[
+        Path,
+        typer.Option("--split-policy", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.split-v1.yaml"),
+    device: Annotated[str | None, typer.Option("--device")] = None,
+) -> None:
+    """Evaluate one selected checkpoint with official and CustomMatchV1 evidence."""
+    from junctionlens.data.license import DatasetRegistrationError, load_registration
+    from junctionlens.data.manifests import ManifestError
+    from junctionlens.data.openlane import OpenLaneAdapter, OpenLaneAdapterError
+    from junctionlens.model.e0_data import E0DataError, load_partition_isolation
+    from junctionlens.model.e0_profile import load_e0_profile
+    from junctionlens.model.e1_profile import load_e1_profile
+    from junctionlens.model.selection_evaluation import (
+        SelectionEvaluationError,
+        evaluate_selected_checkpoint,
+        load_e0_linker,
+        resolve_source_commit,
+    )
+
+    try:
+        project_root = Path.cwd().resolve()
+        registration = load_registration(project_root, "openlane-v2-v2.1", "full")
+        if Path(str(registration["root"])).resolve(strict=True) != dataset_root:
+            raise DatasetRegistrationError(
+                "selected evaluation dataset differs from the checksum-verified registration"
+            )
+        base = load_e0_profile(base_profile_path)
+        isolation = load_partition_isolation(
+            split_manifest,
+            split_policy,
+            partition="model_selection",
+            statistics=False,
+        )
+        experiment_id: Literal["E0-independent", "E1-joint"] = (
+            "E0-independent" if experiment is CheckpointExperiment.E0 else "E1-joint"
+        )
+        if experiment_id == "E0-independent":
+            if linker_path is None:
+                raise SelectionEvaluationError("E0 selected evaluation requires --linker")
+            linker = load_e0_linker(linker_path, base, isolation.split_manifest_sha256)
+            e1 = None
+        else:
+            linker = None
+            e1 = load_e1_profile(e1_profile_path, base)
+        result = evaluate_selected_checkpoint(
+            experiment=experiment_id,
+            run_root=run_root,
+            adapter=OpenLaneAdapter(dataset_root, adapter_config),
+            isolation=isolation,
+            base_profile=base,
+            e1_profile=e1,
+            linker=linker,
+            project_root=project_root,
+            artifact_root=artifact_root,
+            output_root=output_root,
+            source_commit=resolve_source_commit(project_root),
+            device_name=device,
+        )
+    except (
+        DatasetRegistrationError,
+        E0DataError,
+        ManifestError,
+        OpenLaneAdapterError,
+        OSError,
+        RuntimeError,
+        SelectionEvaluationError,
+        TypeError,
+        ValueError,
+    ) as error:
         _fail(error)
         return
     _print(result)

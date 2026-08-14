@@ -14,6 +14,7 @@ from scripts.gpu.source_bundle import (
     SourceBundleError,
     _strict_json_object,
     create_bundle,
+    create_remote_config,
     verify_and_extract,
 )
 
@@ -87,6 +88,170 @@ def test_source_bundle_refuses_clobber(tmp_path: Path) -> None:
     target.mkdir()
     with pytest.raises(SourceBundleError, match="already exists"):
         verify_and_extract(archive, manifest, target)
+
+
+def _license_acknowledgment(path: Path) -> Path:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0.0",
+                "dataset_id": "openlane-v2-v2.1",
+                "license_contract_sha256": "a" * 64,
+                "accepted_terms": [
+                    "Argoverse-2-terms",
+                    "CC-BY-NC-SA-4.0",
+                    "nuScenes-terms",
+                ],
+                "confirmed_restricted_noncommercial_use": True,
+                "redistribution_allowed": False,
+                "acknowledged_at": "2026-08-14T00:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _visual_audit_signoff(path: Path) -> Path:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "junctionlens.visual-audit-signoff.v1",
+                "dataset_id": "openlane-v2-v2.1",
+                "policy_id": "openlane-v2-v2.1-audit-v1",
+                "bundle_manifest_sha256": "b" * 64,
+                "reviewed_file_count": 24,
+                "assertions": {
+                    "camera_projection_alignment_accepted": True,
+                    "bev_geometry_alignment_accepted": True,
+                    "label_identity_and_topology_accepted": True,
+                    "private_data_handling_confirmed": True,
+                },
+                "reviewed_at": "2026-08-14T00:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_core_config_carries_only_validated_license_acknowledgment(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[2]
+    archive = tmp_path / "source.tar"
+    manifest = tmp_path / "source.json"
+    create_bundle(root, archive, manifest, require_clean=False)
+    receipt = _license_acknowledgment(tmp_path / "receipt.json")
+
+    config = create_remote_config(
+        manifest,
+        tmp_path / "config.json",
+        profile="core",
+        remote_data_root="/licensed/data",
+        gpu_uuid=None,
+        license_acknowledgment_path=receipt,
+    )
+
+    assert config["license_acknowledgment"]["accepted_terms"] == [
+        "Argoverse-2-terms",
+        "CC-BY-NC-SA-4.0",
+        "nuScenes-terms",
+    ]
+    assert "root" not in config["license_acknowledgment"]
+    assert len(config["qualification_sha256"]) == 64
+
+
+def test_core_config_carries_hash_bound_visual_audit_signoff(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[2]
+    archive = tmp_path / "source.tar"
+    manifest = tmp_path / "source.json"
+    create_bundle(root, archive, manifest, require_clean=False)
+
+    config = create_remote_config(
+        manifest,
+        tmp_path / "config.json",
+        profile="core",
+        remote_data_root="/licensed/data",
+        gpu_uuid=None,
+        license_acknowledgment_path=_license_acknowledgment(tmp_path / "license.json"),
+        visual_audit_signoff_path=_visual_audit_signoff(tmp_path / "visual.json"),
+    )
+
+    assert config["visual_audit_signoff"]["bundle_manifest_sha256"] == "b" * 64
+    assert all(config["visual_audit_signoff"]["assertions"].values())
+
+
+def test_core_config_rejects_false_visual_audit_assertion(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[2]
+    archive = tmp_path / "source.tar"
+    manifest = tmp_path / "source.json"
+    create_bundle(root, archive, manifest, require_clean=False)
+    signoff = _visual_audit_signoff(tmp_path / "visual.json")
+    value = json.loads(signoff.read_text(encoding="utf-8"))
+    value["assertions"]["camera_projection_alignment_accepted"] = False
+    signoff.write_text(json.dumps(value), encoding="utf-8")
+
+    with pytest.raises(SourceBundleError, match="signoff contract is invalid"):
+        create_remote_config(
+            manifest,
+            tmp_path / "config.json",
+            profile="core",
+            remote_data_root="/licensed/data",
+            gpu_uuid=None,
+            license_acknowledgment_path=_license_acknowledgment(tmp_path / "license.json"),
+            visual_audit_signoff_path=signoff,
+        )
+
+
+def test_remote_run_identity_changes_with_profile_and_machine_inputs(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[2]
+    archive = tmp_path / "source.tar"
+    manifest = tmp_path / "source.json"
+    create_bundle(root, archive, manifest, require_clean=False)
+    cuda = create_remote_config(
+        manifest,
+        tmp_path / "cuda.json",
+        profile="runtime-cuda",
+        remote_data_root=None,
+        gpu_uuid=None,
+    )
+    performance = create_remote_config(
+        manifest,
+        tmp_path / "performance.json",
+        profile="runtime-performance",
+        remote_data_root=None,
+        gpu_uuid="GPU-1234",
+    )
+
+    assert cuda["source_content_sha256"] == performance["source_content_sha256"]
+    assert cuda["qualification_sha256"] != performance["qualification_sha256"]
+
+
+def test_core_config_rejects_missing_or_tampered_acknowledgment(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[2]
+    archive = tmp_path / "source.tar"
+    manifest = tmp_path / "source.json"
+    create_bundle(root, archive, manifest, require_clean=False)
+    with pytest.raises(SourceBundleError, match="requires explicit"):
+        create_remote_config(
+            manifest,
+            tmp_path / "missing.json",
+            profile="core",
+            remote_data_root="/licensed/data",
+            gpu_uuid=None,
+        )
+    receipt = _license_acknowledgment(tmp_path / "receipt.json")
+    value = json.loads(receipt.read_text(encoding="utf-8"))
+    value["private_path"] = "/do/not/transfer"
+    receipt.write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(SourceBundleError, match="contract is invalid"):
+        create_remote_config(
+            manifest,
+            tmp_path / "tampered.json",
+            profile="core",
+            remote_data_root="/licensed/data",
+            gpu_uuid=None,
+            license_acknowledgment_path=receipt,
+        )
 
 
 @pytest.mark.parametrize(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ import yaml
 from junctionlens.data.license import (
     DatasetRegistrationError,
     acknowledge_licenses,
+    install_acknowledgment,
     load_valid_acknowledgment,
     register_dataset,
 )
@@ -59,6 +61,39 @@ def test_receipt_is_private_and_contract_bound(tmp_path: Path) -> None:
     lock_path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
     with pytest.raises(DatasetRegistrationError, match="does not match"):
         load_valid_acknowledgment(lock_path, tmp_path)
+
+
+def test_valid_acknowledgment_can_be_installed_in_isolated_checkout(tmp_path: Path) -> None:
+    """The remote handoff carries consent evidence without copying private state paths."""
+    lock_path = _test_lock(tmp_path, "0" * 32)
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    _acknowledge(lock_path, source)
+    receipt_path = source / ".junctionlens/license-acknowledgments/openlane-v2-v2.1.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    installed = install_acknowledgment(lock_path, target, receipt)
+
+    assert installed == load_valid_acknowledgment(lock_path, target)
+    installed_path = target / ".junctionlens/license-acknowledgments/openlane-v2-v2.1.json"
+    assert installed_path.stat().st_mode & 0o777 == 0o600
+
+
+def test_install_acknowledgment_rejects_tampered_terms(tmp_path: Path) -> None:
+    lock_path = _test_lock(tmp_path, "0" * 32)
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    _acknowledge(lock_path, source)
+    receipt_path = source / ".junctionlens/license-acknowledgments/openlane-v2-v2.1.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["accepted_terms"] = ["CC-BY-NC-SA-4.0"]
+
+    with pytest.raises(DatasetRegistrationError, match="does not match"):
+        install_acknowledgment(lock_path, target, receipt)
 
 
 def test_registration_verifies_archive_and_manifest(tmp_path: Path) -> None:

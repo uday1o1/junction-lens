@@ -36,6 +36,7 @@ from junctionlens.data.visual_audit import (
     VisualAuditError,
     load_audit_policy,
     write_audit_bundle,
+    write_visual_audit_signoff,
 )
 from junctionlens.evaluator.official import EvaluationError
 from junctionlens.registry import ContentAddressedStore, RegistryError
@@ -476,3 +477,42 @@ def visual_audit_command(
     )
     if not receipt.range_gate_accepted:
         raise typer.Exit(code=2)
+
+
+@data_app.command("signoff-visual-audit")
+def signoff_visual_audit_command(
+    bundle_root: Annotated[
+        Path,
+        typer.Option("--bundle", exists=True, file_okay=False, resolve_path=True),
+    ],
+    camera_projection_alignment_accepted: Annotated[
+        bool,
+        typer.Option("--accept-camera-projection-alignment"),
+    ] = False,
+    bev_geometry_alignment_accepted: Annotated[
+        bool,
+        typer.Option("--accept-bev-geometry-alignment"),
+    ] = False,
+    label_identity_and_topology_accepted: Annotated[
+        bool,
+        typer.Option("--accept-label-identity-and-topology"),
+    ] = False,
+    private_data_handling_confirmed: Annotated[
+        bool,
+        typer.Option("--confirm-private-data-handling"),
+    ] = False,
+) -> None:
+    """Record explicit inspection of a digest-verified private audit bundle."""
+    try:
+        receipt = write_visual_audit_signoff(
+            bundle_root,
+            Path.cwd().resolve(),
+            camera_projection_alignment_accepted=camera_projection_alignment_accepted,
+            bev_geometry_alignment_accepted=bev_geometry_alignment_accepted,
+            label_identity_and_topology_accepted=label_identity_and_topology_accepted,
+            private_data_handling_confirmed=private_data_handling_confirmed,
+        )
+    except (OSError, ParseBoundaryError, VisualAuditError, ValueError) as error:
+        _fail(error)
+        return
+    _emit({**receipt, "state": "ACCEPTED"})

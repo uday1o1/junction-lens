@@ -36,8 +36,10 @@ JL_HOST=$JUNCTIONLENS_GPU_HOST
 JL_REMOTE_ROOT=${JUNCTIONLENS_REMOTE_ROOT:-.junctionlens/qualification}
 JL_REMOTE_DATA_ROOT=${JUNCTIONLENS_REMOTE_DATA_ROOT:-}
 JL_GPU_UUID=${JUNCTIONLENS_GPU_UUID:-}
+JL_LICENSE_ACKNOWLEDGMENT=$JL_ROOT/.junctionlens/license-acknowledgments/openlane-v2-v2.1.json
+JL_VISUAL_AUDIT_SIGNOFF=$JL_ROOT/.junctionlens/data-audit-signoffs/openlane-v2-v2.1.json
 JL_POLL_SECONDS=${JUNCTIONLENS_GPU_POLL_SECONDS:-15}
-JL_TIMEOUT_SECONDS=${JUNCTIONLENS_GPU_TIMEOUT_SECONDS:-43200}
+JL_TIMEOUT_SECONDS=${JUNCTIONLENS_GPU_TIMEOUT_SECONDS:-604800}
 
 case "$JL_HOST" in
   -*|*[!A-Za-z0-9_.:@\[\]-]*) echo "JUNCTIONLENS_GPU_HOST is not a safe SSH destination" >&2; exit 2 ;;
@@ -47,6 +49,14 @@ case "$JL_REMOTE_ROOT" in
 esac
 case "$JL_POLL_SECONDS:$JL_TIMEOUT_SECONDS" in
   *[!0-9:]*|:*|*:) echo "GPU polling controls must be positive integers" >&2; exit 2 ;;
+esac
+case "$JL_PROFILE" in
+  core|full-v1)
+    [ -f "$JL_LICENSE_ACKNOWLEDGMENT" ] || {
+      echo "Core qualification requires explicit license acknowledgment; run junctionlens data acknowledge" >&2
+      exit 2
+    }
+    ;;
 esac
 
 for JL_TOOL in git ssh scp python3; do
@@ -74,14 +84,27 @@ fi
 if [ -n "$JL_GPU_UUID" ]; then
   set -- "$@" --gpu-uuid "$JL_GPU_UUID"
 fi
+case "$JL_PROFILE" in
+  core|full-v1)
+    set -- "$@" --license-acknowledgment "$JL_LICENSE_ACKNOWLEDGMENT"
+    if [ -f "$JL_VISUAL_AUDIT_SIGNOFF" ]; then
+      set -- "$@" --visual-audit-signoff "$JL_VISUAL_AUDIT_SIGNOFF"
+    fi
+    ;;
+esac
 "$@" >/dev/null
 
-JL_DIGEST=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["content_sha256"])' "$JL_TEMP/source-manifest.json")
+JL_DIGEST=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["qualification_sha256"])' "$JL_TEMP/remote-config.json")
+JL_SOURCE_DIGEST=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["source_content_sha256"])' "$JL_TEMP/remote-config.json")
 case "$JL_DIGEST" in
   *[!0-9a-f]*) echo "Source bundle digest is invalid" >&2; exit 1 ;;
 esac
 [ "${#JL_DIGEST}" -eq 64 ] || { echo "Source bundle digest length is invalid" >&2; exit 1; }
-JL_BUNDLE_REL=$JL_REMOTE_ROOT/bundles/$JL_DIGEST
+case "$JL_SOURCE_DIGEST" in
+  *[!0-9a-f]*) echo "Source content digest is invalid" >&2; exit 1 ;;
+esac
+[ "${#JL_SOURCE_DIGEST}" -eq 64 ] || { echo "Source content digest length is invalid" >&2; exit 1; }
+JL_BUNDLE_REL=$JL_REMOTE_ROOT/workspaces/$JL_PROFILE/$JL_SOURCE_DIGEST
 JL_INCOMING_REL=$JL_BUNDLE_REL/incoming
 JL_SOURCE_REL=$JL_BUNDLE_REL/source
 JL_RESULT_REL=$JL_BUNDLE_REL/results
@@ -98,9 +121,9 @@ scp -- \
 ssh -- "$JL_HOST" \
   "if [ ! -d \"\$HOME/$JL_SOURCE_REL\" ]; then python3 \"\$HOME/$JL_INCOMING_REL/source_bundle.py\" verify-extract --archive \"\$HOME/$JL_INCOMING_REL/source.tar\" --manifest \"\$HOME/$JL_INCOMING_REL/source-manifest.json\" --target \"\$HOME/$JL_SOURCE_REL\" >/dev/null; fi"
 
-JL_REMOTE_COMMAND="cd \$HOME/$JL_SOURCE_REL && exec ./scripts/gpu/run_remote_qualification.sh \$HOME/$JL_INCOMING_REL/remote-config.json \$HOME/$JL_RESULT_REL > \$HOME/$JL_BUNDLE_REL/runner.log 2>&1"
+JL_REMOTE_COMMAND="cd \$HOME/$JL_SOURCE_REL && ./scripts/gpu/run_remote_qualification.sh \$HOME/$JL_INCOMING_REL/remote-config.json \$HOME/$JL_RESULT_REL > \$HOME/$JL_BUNDLE_REL/runner.log 2>&1; JL_CODE=\$?; rm -f \$HOME/$JL_BUNDLE_REL/runner.pid; exit \$JL_CODE"
 ssh -- "$JL_HOST" \
-  "if [ -f \"\$HOME/$JL_RESULT_REL/status.json\" ]; then exit 0; elif command -v tmux >/dev/null 2>&1; then tmux has-session -t $JL_SESSION 2>/dev/null || tmux new-session -d -s $JL_SESSION \"$JL_REMOTE_COMMAND\"; elif [ -f \"\$HOME/$JL_BUNDLE_REL/runner.pid\" ] && kill -0 \"\$(cat \"\$HOME/$JL_BUNDLE_REL/runner.pid\")\" 2>/dev/null; then exit 0; else nohup sh -c '$JL_REMOTE_COMMAND' </dev/null >/dev/null 2>&1 & echo \$! > \"\$HOME/$JL_BUNDLE_REL/runner.pid\"; fi"
+  "if [ -f \"\$HOME/$JL_RESULT_REL/status.json\" ] && python3 -c 'import json,sys; value=json.load(open(sys.argv[1], encoding=\"utf-8\")); raise SystemExit(0 if value.get(\"status\")==\"PASSED\" and value.get(\"qualification_sha256\")==sys.argv[2] else 1)' \"\$HOME/$JL_RESULT_REL/status.json\" '$JL_DIGEST'; then exit 0; elif command -v tmux >/dev/null 2>&1; then tmux has-session -t $JL_SESSION 2>/dev/null || tmux new-session -d -s $JL_SESSION \"$JL_REMOTE_COMMAND\"; elif [ -f \"\$HOME/$JL_BUNDLE_REL/runner.pid\" ] && kill -0 \"\$(cat \"\$HOME/$JL_BUNDLE_REL/runner.pid\")\" 2>/dev/null; then exit 0; else nohup sh -c '$JL_REMOTE_COMMAND' </dev/null >/dev/null 2>&1 & echo \$! > \"\$HOME/$JL_BUNDLE_REL/runner.pid\"; fi"
 
 JL_STARTED=$(date +%s)
 JL_REMOTE_STATUS=RUNNING

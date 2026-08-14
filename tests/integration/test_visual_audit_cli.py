@@ -39,6 +39,9 @@ def test_visual_audit_public_cli_writes_frozen_private_bundle(
         "junctionlens.cli.data._registered_root",
         lambda *_args, **_kwargs: openlane_root,
     )
+    (openlane_root / "data_dict_subset_A.json").write_bytes(
+        (openlane_root / "data_dict_example.json").read_bytes()
+    )
     output = tmp_path / "audit-bundle"
     result = CliRunner().invoke(
         app,
@@ -47,6 +50,8 @@ def test_visual_audit_public_cli_writes_frozen_private_bundle(
             "visual-audit",
             "--root",
             str(openlane_root),
+            "--profile",
+            "full",
             "--policy",
             str(_audit_policy_for_fixture(tmp_path)),
             "--output",
@@ -64,3 +69,74 @@ def test_visual_audit_public_cli_writes_frozen_private_bundle(
     assert (output / "train/segment-1/100/camera-front_center.png").is_file()
     summary = json.loads((output / "summary.json").read_text(encoding="utf-8"))
     assert "source_domain" in summary["slice_support_preview"]
+
+    monkeypatch.chdir(tmp_path)
+    signoff = CliRunner().invoke(
+        app,
+        [
+            "data",
+            "signoff-visual-audit",
+            "--bundle",
+            str(output),
+            "--accept-camera-projection-alignment",
+            "--accept-bev-geometry-alignment",
+            "--accept-label-identity-and-topology",
+            "--confirm-private-data-handling",
+        ],
+    )
+    assert signoff.exit_code == 0, signoff.output
+    signoff_receipt = json.loads(signoff.stdout)
+    assert signoff_receipt["state"] == "ACCEPTED"
+    assert signoff_receipt["bundle_manifest_sha256"] == receipt["bundle_manifest_sha256"]
+    private_receipt = tmp_path / ".junctionlens/data-audit-signoffs/openlane-v2-v2.1.json"
+    assert private_receipt.stat().st_mode & 0o777 == 0o600
+
+
+def test_visual_signoff_rejects_tampered_bundle(
+    openlane_root: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "junctionlens.cli.data._registered_root",
+        lambda *_args, **_kwargs: openlane_root,
+    )
+    (openlane_root / "data_dict_subset_A.json").write_bytes(
+        (openlane_root / "data_dict_example.json").read_bytes()
+    )
+    output = tmp_path / "audit-bundle"
+    generated = CliRunner().invoke(
+        app,
+        [
+            "data",
+            "visual-audit",
+            "--root",
+            str(openlane_root),
+            "--profile",
+            "full",
+            "--policy",
+            str(_audit_policy_for_fixture(tmp_path)),
+            "--output",
+            str(output),
+        ],
+    )
+    assert generated.exit_code == 0, generated.output
+    (output / "summary.json").write_text("{}\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    signoff = CliRunner().invoke(
+        app,
+        [
+            "data",
+            "signoff-visual-audit",
+            "--bundle",
+            str(output),
+            "--accept-camera-projection-alignment",
+            "--accept-bev-geometry-alignment",
+            "--accept-label-identity-and-topology",
+            "--confirm-private-data-handling",
+        ],
+    )
+
+    assert signoff.exit_code != 0
+    assert "failed size or digest" in signoff.output

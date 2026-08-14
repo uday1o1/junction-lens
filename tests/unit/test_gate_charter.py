@@ -138,3 +138,15 @@ def test_draft_rejects_duplicate_yaml_keys(tmp_path: Path) -> None:
 
     with pytest.raises(CharterError, match="duplicate YAML key"):
         load_charter_draft(draft)
+
+
+def test_source_bundle_commit_override_requires_gitless_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("JUNCTIONLENS_SOURCE_COMMIT", "f" * 40)
+
+    assert charter_module._source_commit(tmp_path) == "f" * 40
+
+    (tmp_path / ".git").mkdir()
+    with pytest.raises(CharterError, match="clean source checkout|cannot resolve"):
+        charter_module._source_commit(tmp_path)

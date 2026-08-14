@@ -107,6 +107,15 @@ def _write_private_json(repository_root: Path, relative: Path, payload: Mapping[
         os.close(descriptor)
 
 
+def write_private_receipt(
+    repository_root: Path,
+    relative: Path,
+    payload: Mapping[str, Any],
+) -> None:
+    """Atomically write an owner-only receipt below the repository root."""
+    _write_private_json(repository_root, relative, payload)
+
+
 def acknowledge_licenses(
     lock_path: Path,
     repository_root: Path,
@@ -146,6 +155,51 @@ def acknowledge_licenses(
     return payload
 
 
+def _validate_acknowledgment(
+    contract: Mapping[str, Any], receipt: Mapping[str, Any]
+) -> Mapping[str, Any]:
+    expected_keys = {
+        "schema_version",
+        "dataset_id",
+        "license_contract_sha256",
+        "accepted_terms",
+        "confirmed_restricted_noncommercial_use",
+        "redistribution_allowed",
+        "acknowledged_at",
+    }
+    if set(receipt) != expected_keys:
+        raise DatasetRegistrationError("license receipt schema is invalid")
+    terms = receipt.get("accepted_terms")
+    expected_terms = sorted(cast(list[str], contract["dataset_licenses"]))
+    if (
+        receipt.get("schema_version") != "1.0.0"
+        or receipt.get("dataset_id") != contract["dataset_id"]
+        or receipt.get("license_contract_sha256") != _canonical_hash(contract)
+        or terms != expected_terms
+        or receipt.get("confirmed_restricted_noncommercial_use") is not True
+        or receipt.get("redistribution_allowed") is not False
+        or not isinstance(receipt.get("acknowledged_at"), str)
+        or not cast(str, receipt["acknowledged_at"])
+    ):
+        raise DatasetRegistrationError("license receipt does not match the current lock contract")
+    return {key: receipt[key] for key in sorted(expected_keys)}
+
+
+def install_acknowledgment(
+    lock_path: Path,
+    repository_root: Path,
+    receipt: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Install a validated non-secret acknowledgment in one isolated checkout."""
+    lock = _load_lock(lock_path)
+    validated = _validate_acknowledgment(_license_contract(lock), receipt)
+    receipt_relative = lock.get("acknowledgment_receipt")
+    if not isinstance(receipt_relative, str):
+        raise DatasetRegistrationError("dataset lock has no receipt path")
+    _write_private_json(repository_root, Path(receipt_relative), validated)
+    return validated
+
+
 def load_valid_acknowledgment(
     lock_path: Path,
     repository_root: Path,
@@ -172,12 +226,7 @@ def load_valid_acknowledgment(
         )
     except ParseBoundaryError as error:
         raise DatasetRegistrationError(str(error)) from error
-    expected_contract_hash = _canonical_hash(_license_contract(lock))
-    if receipt.get("license_contract_sha256") != expected_contract_hash:
-        raise DatasetRegistrationError("license receipt does not match the current lock contract")
-    if receipt.get("confirmed_restricted_noncommercial_use") is not True:
-        raise DatasetRegistrationError("license receipt lacks explicit use confirmation")
-    return receipt
+    return _validate_acknowledgment(_license_contract(lock), receipt)
 
 
 def _hash_file(path: Path) -> tuple[str, str, int]:

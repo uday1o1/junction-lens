@@ -32,12 +32,14 @@ It records the Git commit, Git modes, symbolic-link targets, submodule commits, 
 It creates a deterministic tar containing only declared tracked regular files and safe relative symbolic links.
 
 The remote extractor verifies the manifest and archive hash before extraction, rejects absolute paths, traversal, special files, undeclared members, duplicate members, escaping symbolic links, size changes, mode changes, and post-extraction digest changes.
-Each source manifest maps to one content-addressed directory below the validated remote root.
+Each source manifest and profile maps to one content-addressed workspace below the validated remote root.
 Existing unrelated remote content is never deleted.
 
 The runner uses `tmux` when available and a PID-checked `nohup` fallback otherwise.
 Repeated invocations reconnect to the same content-addressed run.
 Phase reuse requires identical source, command, profile, selected GPU, and declared input hashes.
+Adding a signed visual-review receipt invalidates only the review and downstream model-evidence phases.
+It does not repeat dependency resolution, builds, mechanical data auditing, parity, performance, profiling, or fault qualification.
 
 ## Result contract
 
@@ -57,4 +59,32 @@ The Milestone 8.3 target gate uses:
 
 That profile inherits CUDA correctness, then runs the frozen latency and stability protocol under continuous GPU telemetry and records separate Nsight Systems and ONNX Runtime profiles.
 It exits nonzero for a failed budget, an incomplete 10,000-frame run, profiler failure, or contaminated environment.
-At this source milestone, requesting `core` or `full-v1` still returns a truthful blocked result after the implemented runtime phases until their later handlers exist.
+
+## Portfolio-core qualification
+
+The `core` profile requires the checksum-verified full dataset and an explicit ignored license receipt.
+Create the receipt once from the repository root:
+
+```sh
+uv run --locked junctionlens data acknowledge \
+  --accept-term Argoverse-2-terms \
+  --accept-term CC-BY-NC-SA-4.0 \
+  --accept-term nuScenes-terms \
+  --confirm-restricted-noncommercial-use
+```
+
+Then run the consolidated entry point:
+
+```sh
+./scripts/gpu/qualify_remote.sh --profile core
+```
+
+The core profile audits the licensed adapter and official evaluator, verifies the 32-frame feasibility gate, trains and selects all predeclared E0 and E1 runs, freezes the E0 model card and acceptance charter, runs the complete seeded fault matrix, and binds accelerated runtime and profiler evidence into a private portfolio-core report.
+It never accesses the internal holdout.
+
+The first run can truthfully stop at `LICENSED_VISUAL_AUDIT_REVIEW_REQUIRED` after completing every independent phase.
+The retrieved `USER_ACTION_REQUIRED.md` identifies the private audit bundle and gives the exact signoff and resume commands.
+Reviewing the files is a human decision and must not be automated or inferred.
+After a valid signoff, rerunning the same core command resumes the hash-matched workspace.
+
+The `full-v1` profile remains blocked at the conditional extension boundary until this exact core evidence bundle is accepted and the Milestone 6 promotion work is authorized by its measured result.

@@ -11,6 +11,7 @@ import tempfile
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from html import escape
 from pathlib import Path
 from typing import Any, cast
@@ -21,11 +22,13 @@ from PIL import Image, ImageDraw
 
 from junctionlens.data.contracts import AdaptedFrame, CameraFrame, Point3
 from junctionlens.data.geometry import project_vehicle_points
+from junctionlens.data.license import write_private_receipt
 from junctionlens.data.openlane import OpenLaneAdapter, OpenLaneAdapterError
 from junctionlens.registry.store import canonical_json_bytes
 from junctionlens.security.parsing import (
     ParseBoundaryError,
     ParseLimits,
+    load_json_object_path,
     load_yaml_object,
     read_bounded_file,
 )
@@ -892,6 +895,101 @@ def write_audit_bundle(
     )
 
 
+def write_visual_audit_signoff(
+    bundle_root: Path,
+    repository_root: Path,
+    *,
+    camera_projection_alignment_accepted: bool,
+    bev_geometry_alignment_accepted: bool,
+    label_identity_and_topology_accepted: bool,
+    private_data_handling_confirmed: bool,
+) -> Mapping[str, Any]:
+    """Verify every private bundle file and record explicit human inspection."""
+    root = bundle_root.resolve(strict=True)
+    if bundle_root.is_symlink() or not root.is_dir():
+        raise VisualAuditError("visual audit bundle must be a real directory")
+    confirmations = {
+        "camera_projection_alignment_accepted": camera_projection_alignment_accepted,
+        "bev_geometry_alignment_accepted": bev_geometry_alignment_accepted,
+        "label_identity_and_topology_accepted": label_identity_and_topology_accepted,
+        "private_data_handling_confirmed": private_data_handling_confirmed,
+    }
+    if not all(confirmations.values()):
+        raise VisualAuditError("every visual audit signoff assertion must be explicit")
+    manifest_path = root / "manifest.json"
+    try:
+        manifest = load_json_object_path(
+            manifest_path,
+            "private visual audit manifest",
+            ParseLimits(max_bytes=4 * 1024 * 1024, max_depth=24, max_nodes=100_000),
+        )
+    except ParseBoundaryError as error:
+        raise VisualAuditError(str(error)) from error
+    raw_files = manifest.get("files")
+    if (
+        manifest.get("schema_version") != "junctionlens.openlane-audit-bundle.v1"
+        or manifest.get("profile") != "full"
+        or manifest.get("manual_review_state") != "PENDING_HUMAN_INSPECTION"
+        or not isinstance(raw_files, list)
+        or not raw_files
+    ):
+        raise VisualAuditError("visual audit bundle manifest is invalid")
+    tree_entries = list(root.rglob("*"))
+    if any(path.is_symlink() for path in tree_entries):
+        raise VisualAuditError("visual audit bundle cannot contain symbolic links")
+    if any(not path.is_file() and not path.is_dir() for path in tree_entries):
+        raise VisualAuditError("visual audit bundle cannot contain special files")
+    expected_paths: set[str] = set()
+    for raw in raw_files:
+        if not isinstance(raw, dict):
+            raise VisualAuditError("visual audit file record is invalid")
+        relative_value = raw.get("path")
+        if not isinstance(relative_value, str):
+            raise VisualAuditError("visual audit file path is invalid")
+        relative = Path(relative_value)
+        if relative.is_absolute() or not relative.parts or ".." in relative.parts:
+            raise VisualAuditError("visual audit file path is unsafe")
+        path = root / relative
+        if path.is_symlink() or not path.is_file():
+            raise VisualAuditError("visual audit file is missing or symbolic")
+        byte_size = raw.get("byte_size")
+        sha256 = raw.get("sha256")
+        if (
+            isinstance(byte_size, bool)
+            or not isinstance(byte_size, int)
+            or byte_size != path.stat().st_size
+            or not isinstance(sha256, str)
+            or sha256 != hashlib.sha256(path.read_bytes()).hexdigest()
+        ):
+            raise VisualAuditError("visual audit file failed size or digest verification")
+        if relative.as_posix() in expected_paths:
+            raise VisualAuditError("visual audit manifest repeats a file path")
+        expected_paths.add(relative.as_posix())
+    observed_paths = {
+        path.relative_to(root).as_posix()
+        for path in tree_entries
+        if path.is_file() and path != manifest_path
+    }
+    if observed_paths != expected_paths:
+        raise VisualAuditError("visual audit bundle has missing or undeclared files")
+    manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    receipt: Mapping[str, Any] = {
+        "schema_version": "junctionlens.visual-audit-signoff.v1",
+        "dataset_id": "openlane-v2-v2.1",
+        "policy_id": manifest.get("policy_id"),
+        "bundle_manifest_sha256": manifest_sha256,
+        "reviewed_file_count": len(expected_paths),
+        "assertions": confirmations,
+        "reviewed_at": datetime.now(UTC).isoformat(),
+    }
+    write_private_receipt(
+        repository_root,
+        Path(".junctionlens/data-audit-signoffs/openlane-v2-v2.1.json"),
+        receipt,
+    )
+    return receipt
+
+
 __all__ = [
     "AuditBundleReceipt",
     "AuditPolicy",
@@ -904,4 +1002,5 @@ __all__ = [
     "render_camera_overlay",
     "slice_values",
     "write_audit_bundle",
+    "write_visual_audit_signoff",
 ]

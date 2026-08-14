@@ -6,13 +6,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import shutil
 import stat
 import subprocess
+import sys
 import tarfile
 import tempfile
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -28,6 +29,31 @@ LOCK_PATHS = (
 MAX_MANIFEST_BYTES = 16 * 1024 * 1024
 MAX_MANIFEST_DEPTH = 16
 MAX_MANIFEST_NODES = 500_000
+LICENSE_ACKNOWLEDGMENT_KEYS = {
+    "schema_version",
+    "dataset_id",
+    "license_contract_sha256",
+    "accepted_terms",
+    "confirmed_restricted_noncommercial_use",
+    "redistribution_allowed",
+    "acknowledged_at",
+}
+LICENSE_TERMS = ["Argoverse-2-terms", "CC-BY-NC-SA-4.0", "nuScenes-terms"]
+VISUAL_AUDIT_SIGNOFF_KEYS = {
+    "schema_version",
+    "dataset_id",
+    "policy_id",
+    "bundle_manifest_sha256",
+    "reviewed_file_count",
+    "assertions",
+    "reviewed_at",
+}
+VISUAL_AUDIT_ASSERTIONS = {
+    "camera_projection_alignment_accepted",
+    "bev_geometry_alignment_accepted",
+    "label_identity_and_topology_accepted",
+    "private_data_handling_confirmed",
+}
 
 
 class SourceBundleError(RuntimeError):
@@ -102,6 +128,69 @@ def _canonical_json(value: Mapping[str, Any]) -> bytes:
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
     ).encode("utf-8")
+
+
+def _load_license_acknowledgment(path: Path) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise SourceBundleError("license acknowledgment must be a regular file")
+    if path.stat().st_size > 64 * 1024:
+        raise SourceBundleError("license acknowledgment exceeds the byte limit")
+    value = _strict_json_object(path.read_bytes())
+    digest = value.get("license_contract_sha256")
+    timestamp = value.get("acknowledged_at")
+    try:
+        parsed_timestamp = datetime.fromisoformat(timestamp) if isinstance(timestamp, str) else None
+    except ValueError as error:
+        raise SourceBundleError("license acknowledgment timestamp is invalid") from error
+    if (
+        set(value) != LICENSE_ACKNOWLEDGMENT_KEYS
+        or value.get("schema_version") != "1.0.0"
+        or value.get("dataset_id") != "openlane-v2-v2.1"
+        or not isinstance(digest, str)
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest)
+        or value.get("accepted_terms") != LICENSE_TERMS
+        or value.get("confirmed_restricted_noncommercial_use") is not True
+        or value.get("redistribution_allowed") is not False
+        or parsed_timestamp is None
+        or parsed_timestamp.tzinfo is None
+    ):
+        raise SourceBundleError("license acknowledgment contract is invalid")
+    return {key: value[key] for key in sorted(LICENSE_ACKNOWLEDGMENT_KEYS)}
+
+
+def _load_visual_audit_signoff(path: Path) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise SourceBundleError("visual audit signoff must be a regular file")
+    if path.stat().st_size > 64 * 1024:
+        raise SourceBundleError("visual audit signoff exceeds the byte limit")
+    value = _strict_json_object(path.read_bytes())
+    assertions = value.get("assertions")
+    digest = value.get("bundle_manifest_sha256")
+    timestamp = value.get("reviewed_at")
+    try:
+        parsed_timestamp = datetime.fromisoformat(timestamp) if isinstance(timestamp, str) else None
+    except ValueError as error:
+        raise SourceBundleError("visual audit signoff timestamp is invalid") from error
+    if (
+        set(value) != VISUAL_AUDIT_SIGNOFF_KEYS
+        or value.get("schema_version") != "junctionlens.visual-audit-signoff.v1"
+        or value.get("dataset_id") != "openlane-v2-v2.1"
+        or value.get("policy_id") != "openlane-v2-v2.1-audit-v1"
+        or not isinstance(digest, str)
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest)
+        or isinstance(value.get("reviewed_file_count"), bool)
+        or not isinstance(value.get("reviewed_file_count"), int)
+        or value["reviewed_file_count"] <= 0
+        or not isinstance(assertions, dict)
+        or set(assertions) != VISUAL_AUDIT_ASSERTIONS
+        or not all(item is True for item in assertions.values())
+        or parsed_timestamp is None
+        or parsed_timestamp.tzinfo is None
+    ):
+        raise SourceBundleError("visual audit signoff contract is invalid")
+    return {key: value[key] for key in sorted(VISUAL_AUDIT_SIGNOFF_KEYS)}
 
 
 def _validate_relative_path(value: str) -> PurePosixPath:
@@ -339,11 +428,25 @@ def create_remote_config(
     profile: str,
     remote_data_root: str | None,
     gpu_uuid: str | None,
+    license_acknowledgment_path: Path | None = None,
+    visual_audit_signoff_path: Path | None = None,
 ) -> dict[str, Any]:
     """Create the non-secret configuration consumed by the remote runner."""
     if profile not in {"m0.3", "runtime-cuda", "runtime-performance", "core", "full-v1"}:
         raise SourceBundleError("remote qualification profile is invalid")
     manifest = _load_manifest(manifest_path)
+    license_acknowledgment = (
+        _load_license_acknowledgment(license_acknowledgment_path)
+        if license_acknowledgment_path is not None
+        else None
+    )
+    visual_audit_signoff = (
+        _load_visual_audit_signoff(visual_audit_signoff_path)
+        if visual_audit_signoff_path is not None
+        else None
+    )
+    if profile in {"core", "full-v1"} and license_acknowledgment is None:
+        raise SourceBundleError(f"{profile} qualification requires explicit license acknowledgment")
     value = {
         "schema_version": "junctionlens.remote-qualification-config.v1",
         "profile": profile,
@@ -351,7 +454,10 @@ def create_remote_config(
         "source_content_sha256": manifest["content_sha256"],
         "remote_data_root": remote_data_root or None,
         "gpu_uuid": gpu_uuid or None,
+        "license_acknowledgment": license_acknowledgment,
+        "visual_audit_signoff": visual_audit_signoff,
     }
+    value["qualification_sha256"] = hashlib.sha256(_canonical_json(value)).hexdigest()
     if output_path.exists():
         raise SourceBundleError("remote configuration output already exists")
     output_path.write_bytes(_canonical_json(value) + b"\n")
@@ -375,6 +481,8 @@ def _parse_args() -> argparse.Namespace:
     config.add_argument("--profile", required=True)
     config.add_argument("--remote-data-root")
     config.add_argument("--gpu-uuid")
+    config.add_argument("--license-acknowledgment", type=Path)
+    config.add_argument("--visual-audit-signoff", type=Path)
     return parser.parse_args()
 
 
@@ -393,9 +501,11 @@ def main() -> int:
                 profile=arguments.profile,
                 remote_data_root=arguments.remote_data_root,
                 gpu_uuid=arguments.gpu_uuid,
+                license_acknowledgment_path=arguments.license_acknowledgment,
+                visual_audit_signoff_path=arguments.visual_audit_signoff,
             )
     except SourceBundleError as error:
-        print(f"source bundle error: {error}", file=os.sys.stderr)
+        print(f"source bundle error: {error}", file=sys.stderr)
         return 1
     print(json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False))
     return 0
