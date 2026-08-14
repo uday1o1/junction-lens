@@ -2,6 +2,7 @@ include(FetchContent)
 
 set(JUNCTIONLENS_PROTOBUF_VERSION "31.1")
 set(JUNCTIONLENS_PROTOBUF_RUNTIME_VERSION "6.31.1")
+set(JUNCTIONLENS_ABSEIL_COMMIT "9ac7062b1860d895fb5a8cbf58c3e9ef8f674b5f")
 set(JUNCTIONLENS_ONNX_VERSION "1.18.0")
 set(JUNCTIONLENS_ONNXRUNTIME_VERSION "1.25.0")
 set(JUNCTIONLENS_EIGEN_VERSION "3.4.0")
@@ -34,11 +35,30 @@ if(DEFINED _junctionlens_onnxruntime_library AND EXISTS "${_junctionlens_onnxrun
 endif()
 
 FetchContent_Declare(
+  absl
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+  GIT_TAG ${JUNCTIONLENS_ABSEIL_COMMIT}
+  GIT_SHALLOW FALSE
+  EXCLUDE_FROM_ALL
+)
+FetchContent_Declare(
   junctionlens_protobuf
   URL https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protobuf-31.1.tar.gz
   URL_HASH SHA256=12bfd76d27b9ac3d65c00966901609e020481b9474ef75c7ff4601ac06fa0b82
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  EXCLUDE_FROM_ALL
 )
+
+set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(protobuf_BUILD_PROTOC_BINARIES OFF CACHE BOOL "" FORCE)
+set(protobuf_BUILD_LIBPROTOC OFF CACHE BOOL "" FORCE)
+set(protobuf_BUILD_LIBUPB OFF CACHE BOOL "" FORCE)
+set(protobuf_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(protobuf_INSTALL OFF CACHE BOOL "" FORCE)
+set(utf8_range_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+set(ABSL_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(junctionlens_protobuf)
 FetchContent_Declare(
   junctionlens_eigen
   URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz

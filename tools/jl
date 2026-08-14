@@ -11,7 +11,7 @@ usage() {
   cat <<'EOF'
 Usage: ./tools/jl <command>
 
-Milestone 0 commands:
+Repository commands:
   bootstrap-cpu
   configure-cpu
   build-cpu
@@ -22,6 +22,8 @@ Milestone 0 commands:
   test-cpp
   test-python
   test-contract
+  generate-bindings
+  test-web
   build-evaluator [--check-lock]
   test-evaluator
   verify-locks [--online]
@@ -33,6 +35,7 @@ Milestone 0 commands:
   model-providers
   model-benchmark
   verify-m0-3-local
+  verify-m1-1
 EOF
 }
 
@@ -59,7 +62,7 @@ case "$JL_COMMAND" in
     ;;
   format-check)
     uv run --locked ruff format --check python tests scripts containers/evaluator_runner.py
-    pnpm exec prettier --check package.json pnpm-workspace.yaml
+    pnpm run format:check
     ;;
   lint)
     uv run --locked ruff check python tests scripts containers/evaluator_runner.py
@@ -75,6 +78,13 @@ case "$JL_COMMAND" in
     ;;
   test-contract)
     uv run --locked pytest tests/contract "$@"
+    ;;
+  generate-bindings)
+    python scripts/contracts/generate_bindings.py --python "$@"
+    ;;
+  test-web)
+    pnpm run typecheck:web
+    pnpm run test:contract
     ;;
   build-evaluator)
     uv run --locked python scripts/containers/build_evaluator.py "$@"
@@ -128,6 +138,18 @@ case "$JL_COMMAND" in
     "$0" model-providers
     "$0" test-evaluator --output "$JL_ROOT/artifacts/m0/model-spike/evaluator.json"
     "$0" model-benchmark
+    ;;
+  verify-m1-1)
+    "$0" generate-bindings
+    "$0" configure-cpu
+    "$0" build-cpu
+    "$0" format-check
+    "$0" lint
+    "$0" typecheck
+    "$0" test-cpp
+    "$0" test-python
+    "$0" test-web
+    junctionlens contract validate --input "$JL_ROOT/tests/fixtures/contract/v1/golden.pb"
     ;;
   -h|--help|help)
     usage

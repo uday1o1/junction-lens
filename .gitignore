@@ -29,6 +29,8 @@ build-*/
 /profiles/
 /private-thumbnails/
 /.junctionlens/
+/python/junctionlens/v1/scene_control_graph_pb2.py
+/python/junctionlens/v1/scene_control_graph_pb2.pyi
 
 # Machine-local configuration
 .env

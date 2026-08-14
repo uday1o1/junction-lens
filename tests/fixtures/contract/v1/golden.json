@@ -1,0 +1,879 @@
+{
+  "graph": {
+    "edges": [
+      {
+        "binary_decision": true,
+        "calibrated_probability": 0.88,
+        "edge_id": "16014709249781990651",
+        "edge_type": "GRAPH_EDGE_TYPE_CONTROL_APPLIES_TO_LANE",
+        "raw_probability": 0.91,
+        "source_node_id": "144115188075855873",
+        "target_node_id": "72057594037927937",
+        "uncertainty": {
+          "method": "bootstrap",
+          "standard_deviation": 0.03
+        }
+      }
+    ],
+    "frame_key": {
+      "calibration_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dataset_id": "synthetic",
+      "dataset_version": "v1",
+      "frame_manifest_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "segment_id": "segment-0001",
+      "source_domain": "SOURCE_DOMAIN_SYNTHETIC",
+      "split_id": "golden",
+      "timestamp_ns": "1725000000000000000"
+    },
+    "lanes": [
+      {
+        "centerline": {
+          "confidence": 0.95,
+          "point_uncertainty": [
+            {
+              "x": 0.1,
+              "y": 0.1,
+              "z": 0.1
+            },
+            {
+              "x": 0.1,
+              "y": 0.1,
+              "z": 0.1
+            }
+          ],
+          "points": [
+            {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            {
+              "x": 0.0,
+              "y": 10.0,
+              "z": 0.0
+            }
+          ]
+        },
+        "centerline_laplace_scale_m": [
+          {
+            "x": 0.1,
+            "y": 0.1,
+            "z": 0.1
+          },
+          {
+            "x": 0.1,
+            "y": 0.1,
+            "z": 0.1
+          }
+        ],
+        "decoder_query_index": 2,
+        "existence_confidence": 0.99,
+        "intersection_or_connector_probability": 0.2,
+        "left_boundary": {
+          "confidence": 0.95,
+          "point_uncertainty": [
+            {
+              "x": 0.1,
+              "y": 0.1,
+              "z": 0.1
+            },
+            {
+              "x": 0.1,
+              "y": 0.1,
+              "z": 0.1
+            }
+          ],
+          "points": [
+            {
+              "x": -1.5,
+              "y": 0.0,
+              "z": 0.0
+            },
+            {
+              "x": -1.5,
+              "y": 10.0,
+              "z": 0.0
+            }
+          ]
+        },
+        "left_boundary_type": {
+          "probabilities": [
+            0.1,
+            0.9
+          ]
+        },
+        "node_id": "72057594037927937",
+        "right_boundary": {
+          "confidence": 0.95,
+          "point_uncertainty": [
+            {
+              "x": 0.1,
+              "y": 0.1,
+              "z": 0.1
+            },
+            {
+              "x": 0.1,
+              "y": 0.1,
+              "z": 0.1
+            }
+          ],
+          "points": [
+            {
+              "x": 1.5,
+              "y": 0.0,
+              "z": 0.0
+            },
+            {
+              "x": 1.5,
+              "y": 10.0,
+              "z": 0.0
+            }
+          ]
+        },
+        "right_boundary_type": {
+          "probabilities": [
+            0.8,
+            0.2
+          ]
+        },
+        "track_id": "101"
+      }
+    ],
+    "raw_tensor_artifacts": [],
+    "road_areas": [
+      {
+        "category_distribution": {
+          "probabilities": [
+            0.85,
+            0.15
+          ]
+        },
+        "decoder_query_index": 0,
+        "existence_confidence": 0.9,
+        "geometry": {
+          "confidence": 0.95,
+          "point_uncertainty": [
+            {
+              "x": 0.1,
+              "y": 0.1,
+              "z": 0.1
+            },
+            {
+              "x": 0.1,
+              "y": 0.1,
+              "z": 0.1
+            },
+            {
+              "x": 0.1,
+              "y": 0.1,
+              "z": 0.1
+            },
+            {
+              "x": 0.1,
+              "y": 0.1,
+              "z": 0.1
+            }
+          ],
+          "points": [
+            {
+              "x": -3.0,
+              "y": 5.0,
+              "z": 0.0
+            },
+            {
+              "x": 3.0,
+              "y": 5.0,
+              "z": 0.0
+            },
+            {
+              "x": 3.0,
+              "y": 8.0,
+              "z": 0.0
+            },
+            {
+              "x": -3.0,
+              "y": 8.0,
+              "z": 0.0
+            }
+          ]
+        },
+        "geometry_uncertainty": [
+          {
+            "x": 0.2,
+            "y": 0.2,
+            "z": 0.2
+          },
+          {
+            "x": 0.2,
+            "y": 0.2,
+            "z": 0.2
+          },
+          {
+            "x": 0.2,
+            "y": 0.2,
+            "z": 0.2
+          },
+          {
+            "x": 0.2,
+            "y": 0.2,
+            "z": 0.2
+          }
+        ],
+        "node_id": "216172782113783809",
+        "track_id": "103"
+      }
+    ],
+    "role": "GRAPH_ROLE_PREDICTION",
+    "sensor_frame": {
+      "adapter_version": "golden-v1",
+      "cameras": [
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 1080,
+            "resized_width": 1920
+          },
+          "intrinsic": {
+            "values": [
+              1000.0,
+              0.0,
+              960.0,
+              0.0,
+              1000.0,
+              540.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 1080,
+          "original_image": {
+            "byte_size": "12345",
+            "kind": "ARTIFACT_KIND_SOURCE_IMAGE",
+            "license_id": "LicenseRef-JunctionLens-Synthetic",
+            "media_type": "image/jpeg",
+            "relative_uri": "images/front-center.jpg",
+            "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "original_width": 1920,
+          "slot": "CAMERA_SLOT_FRONT_CENTER",
+          "t_vehicle_camera": {
+            "values": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": true
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 1080,
+            "resized_width": 1920
+          },
+          "intrinsic": {
+            "values": [
+              1000.0,
+              0.0,
+              960.0,
+              0.0,
+              1000.0,
+              540.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 0,
+          "original_width": 0,
+          "slot": "CAMERA_SLOT_FRONT_LEFT",
+          "t_vehicle_camera": {
+            "values": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": false
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 1080,
+            "resized_width": 1920
+          },
+          "intrinsic": {
+            "values": [
+              1000.0,
+              0.0,
+              960.0,
+              0.0,
+              1000.0,
+              540.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 0,
+          "original_width": 0,
+          "slot": "CAMERA_SLOT_FRONT_RIGHT",
+          "t_vehicle_camera": {
+            "values": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": false
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 1080,
+            "resized_width": 1920
+          },
+          "intrinsic": {
+            "values": [
+              1000.0,
+              0.0,
+              960.0,
+              0.0,
+              1000.0,
+              540.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 0,
+          "original_width": 0,
+          "slot": "CAMERA_SLOT_SIDE_LEFT",
+          "t_vehicle_camera": {
+            "values": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": false
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 1080,
+            "resized_width": 1920
+          },
+          "intrinsic": {
+            "values": [
+              1000.0,
+              0.0,
+              960.0,
+              0.0,
+              1000.0,
+              540.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 0,
+          "original_width": 0,
+          "slot": "CAMERA_SLOT_SIDE_RIGHT",
+          "t_vehicle_camera": {
+            "values": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": false
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 1080,
+            "resized_width": 1920
+          },
+          "intrinsic": {
+            "values": [
+              1000.0,
+              0.0,
+              960.0,
+              0.0,
+              1000.0,
+              540.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 0,
+          "original_width": 0,
+          "slot": "CAMERA_SLOT_REAR_LEFT",
+          "t_vehicle_camera": {
+            "values": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": false
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 1080,
+            "resized_width": 1920
+          },
+          "intrinsic": {
+            "values": [
+              1000.0,
+              0.0,
+              960.0,
+              0.0,
+              1000.0,
+              540.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 0,
+          "original_width": 0,
+          "slot": "CAMERA_SLOT_REAR_CENTER",
+          "t_vehicle_camera": {
+            "values": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": false
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 1080,
+            "resized_width": 1920
+          },
+          "intrinsic": {
+            "values": [
+              1000.0,
+              0.0,
+              960.0,
+              0.0,
+              1000.0,
+              540.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 0,
+          "original_width": 0,
+          "slot": "CAMERA_SLOT_REAR_RIGHT",
+          "t_vehicle_camera": {
+            "values": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": false
+        }
+      ],
+      "frame_key": {
+        "calibration_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "dataset_id": "synthetic",
+        "dataset_version": "v1",
+        "frame_manifest_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "segment_id": "segment-0001",
+        "source_domain": "SOURCE_DOMAIN_SYNTHETIC",
+        "split_id": "golden",
+        "timestamp_ns": "1725000000000000000"
+      },
+      "pose_valid": true,
+      "t_world_vehicle": {
+        "values": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "tracks": [
+      {
+        "age_observed_frames": 1,
+        "current_node_id": "72057594037927937",
+        "first_timestamp_ns": "1725000000000000000",
+        "last_timestamp_ns": "1725000000000000000",
+        "matching_cost": {
+          "class_cost": 0.2,
+          "geometry": 0.1,
+          "motion": 0.05,
+          "total": 0.35
+        },
+        "missed_frame_count": 0,
+        "node_type": "NODE_TYPE_LANE_SEGMENT",
+        "termination_reason": "TRACK_TERMINATION_REASON_ACTIVE",
+        "track_id": "101"
+      },
+      {
+        "age_observed_frames": 1,
+        "current_node_id": "144115188075855873",
+        "first_timestamp_ns": "1725000000000000000",
+        "last_timestamp_ns": "1725000000000000000",
+        "matching_cost": {
+          "class_cost": 0.2,
+          "geometry": 0.1,
+          "motion": 0.05,
+          "total": 0.35
+        },
+        "missed_frame_count": 0,
+        "node_type": "NODE_TYPE_TRAFFIC_CONTROL",
+        "termination_reason": "TRACK_TERMINATION_REASON_ACTIVE",
+        "track_id": "102"
+      },
+      {
+        "age_observed_frames": 1,
+        "current_node_id": "216172782113783809",
+        "first_timestamp_ns": "1725000000000000000",
+        "last_timestamp_ns": "1725000000000000000",
+        "matching_cost": {
+          "class_cost": 0.2,
+          "geometry": 0.1,
+          "motion": 0.05,
+          "total": 0.35
+        },
+        "missed_frame_count": 0,
+        "node_type": "NODE_TYPE_ROAD_AREA",
+        "termination_reason": "TRACK_TERMINATION_REASON_ACTIVE",
+        "track_id": "103"
+      }
+    ],
+    "traffic_controls": [
+      {
+        "attribute_distribution": {
+          "probabilities": [
+            0.1,
+            0.2,
+            0.7
+          ]
+        },
+        "calibrated_attribute_confidence": 0.92,
+        "calibrated_class_confidence": 0.96,
+        "category_distribution": {
+          "probabilities": [
+            0.05,
+            0.9,
+            0.05
+          ]
+        },
+        "decoder_query_index": 4,
+        "existence_confidence": 0.98,
+        "node_id": "144115188075855873",
+        "normalized_half_open_box": {
+          "x_max": 0.094140625,
+          "x_min": 0.05221354166666667,
+          "y_max": 0.2965277777777778,
+          "y_min": 0.18564814814814815
+        },
+        "source_camera": "CAMERA_SLOT_FRONT_CENTER",
+        "source_pixel_box": {
+          "convention": "SOURCE_BOX_CONVENTION_XYXY_HALF_OPEN",
+          "image_height": 1080,
+          "image_width": 1920,
+          "x0": 100.25,
+          "x1": 180.75,
+          "y0": 200.5,
+          "y1": 320.25
+        },
+        "track_id": "102"
+      }
+    ],
+    "warnings": []
+  },
+  "producer": {
+    "configuration_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "execution_provider_profile": "cpu-reference",
+    "git_commit": "1111111111111111111111111111111111111111",
+    "git_dirty": false,
+    "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "provider_assignment_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+    "random_seed": "7",
+    "runtime_build_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+  },
+  "schema_major": 1,
+  "schema_minor": 0
+}

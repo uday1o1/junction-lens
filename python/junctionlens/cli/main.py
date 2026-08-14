@@ -8,6 +8,7 @@ from typing import Annotated
 
 import typer
 
+from junctionlens.cli.contract import contract_app
 from junctionlens.cli.data import data_app
 from junctionlens.cli.model import model_app
 from junctionlens.doctor.service import run_doctor
@@ -19,6 +20,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(data_app, name="data")
+app.add_typer(contract_app, name="contract")
 app.add_typer(model_app, name="model")
 
 

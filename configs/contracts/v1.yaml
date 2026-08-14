@@ -1,0 +1,15 @@
+schema:
+  major: 1
+  minor: 0
+limits:
+  serialized_bytes: 67108864
+  string_bytes: 4096
+  cameras_per_frame: 8
+  points_per_polyline: 4096
+  lanes_per_frame: 4096
+  traffic_controls_per_frame: 4096
+  road_areas_per_frame: 4096
+  edges_per_frame: 131072
+  tracks_per_frame: 8192
+  artifacts_per_frame: 1024
+  warnings_per_frame: 1024

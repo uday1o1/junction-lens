@@ -9,8 +9,10 @@
     "pnpm": "10.17.1"
   },
   "scripts": {
-    "format:check": "prettier --check package.json",
-    "lock:check": "pnpm install --frozen-lockfile --ignore-scripts"
+    "format:check": "prettier --check package.json pnpm-workspace.yaml web",
+    "lock:check": "pnpm install --frozen-lockfile --ignore-scripts",
+    "test:contract": "vitest run web/tests/contract-ids.test.ts",
+    "typecheck:web": "tsc --noEmit -p web/tsconfig.json"
   },
   "dependencies": {
     "@vitejs/plugin-react": "4.7.0",

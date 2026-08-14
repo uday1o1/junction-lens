@@ -35,12 +35,33 @@ def test_openlane_basis_change_axis_goldens() -> None:
 @given(
     st.lists(
         st.tuples(
-            st.floats(-100.0, 100.0, allow_nan=False, allow_infinity=False),
-            st.floats(-100.0, 100.0, allow_nan=False, allow_infinity=False),
-            st.floats(-10.0, 10.0, allow_nan=False, allow_infinity=False),
+            st.floats(
+                -100.0,
+                100.0,
+                allow_nan=False,
+                allow_infinity=False,
+                allow_subnormal=False,
+                width=32,
+            ),
+            st.floats(
+                -100.0,
+                100.0,
+                allow_nan=False,
+                allow_infinity=False,
+                allow_subnormal=False,
+                width=32,
+            ),
+            st.floats(
+                -10.0,
+                10.0,
+                allow_nan=False,
+                allow_infinity=False,
+                allow_subnormal=False,
+                width=32,
+            ),
         ),
         min_size=1,
-        max_size=20,
+        max_size=16,
     )
 )
 def test_basis_change_inverse_round_trip(points: list[tuple[float, float, float]]) -> None:

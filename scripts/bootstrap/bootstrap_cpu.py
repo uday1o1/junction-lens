@@ -146,6 +146,14 @@ def bootstrap(sync: bool) -> None:
     env["COREPACK_HOME"] = str(root / ".tools" / "corepack")
     env["CI"] = "true"
     env["UV_CACHE_DIR"] = str(root / ".cache" / "uv")
+    _run_checked(
+        [
+            sys.executable,
+            str(root / "scripts/contracts/generate_bindings.py"),
+            "--python",
+        ],
+        env,
+    )
     corepack = installed["node"] / "bin" / "corepack"
     if not corepack.is_file():
         raise BootstrapError("locked Node distribution does not contain corepack")

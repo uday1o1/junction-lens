@@ -100,6 +100,10 @@ explicit = true
 target-version = "py312"
 line-length = 100
 src = ["python", "tests"]
+extend-exclude = [
+  "python/junctionlens/v1/scene_control_graph_pb2.py",
+  "python/junctionlens/v1/scene_control_graph_pb2.pyi",
+]
 
 [tool.ruff.lint]
 select = ["B", "C4", "E", "F", "I", "PIE", "PT", "PTH", "RUF", "S", "SIM", "UP", "W"]
@@ -116,6 +120,7 @@ python_version = "3.12"
 strict = true
 packages = ["junctionlens"]
 mypy_path = "python"
+exclude = ["python/junctionlens/v1/scene_control_graph_pb2.py"]
 
 [[tool.mypy.overrides]]
 module = ["torch", "torch.*"]
@@ -123,6 +128,10 @@ follow_imports = "skip"
 
 [[tool.mypy.overrides]]
 module = ["onnxruntime", "onnxruntime.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["google.protobuf", "google.protobuf.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
