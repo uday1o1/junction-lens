@@ -40,6 +40,7 @@ Repository commands:
   test-integration-gate
   test-integration-topology
   test-integration-e1-study
+  test-integration-registry
   test-web
   build-evaluator [--check-lock]
   test-evaluator
@@ -66,6 +67,7 @@ Repository commands:
   verify-m4-2-local
   verify-m5-1-local
   verify-m5-2-local
+  verify-m7-1-local
 EOF
 }
 
@@ -225,6 +227,12 @@ case "$JL_COMMAND" in
       "$JL_ROOT/tests/integration/test_e1_study_cli.py" \
       "$@"
     ;;
+  test-integration-registry)
+    uv run --locked pytest \
+      "$JL_ROOT/tests/unit/test_registry_store.py" \
+      "$JL_ROOT/tests/integration/test_registry_cli.py" \
+      "$@"
+    ;;
   test-web)
     pnpm run typecheck:web
     pnpm run test:contract
@@ -352,6 +360,10 @@ case "$JL_COMMAND" in
   verify-m5-2-local)
     "$0" verify-m5-1-local
     "$0" test-integration-e1-study
+    ;;
+  verify-m7-1-local)
+    "$0" verify-m5-2-local
+    "$0" test-integration-registry
     ;;
   -h|--help|help)
     usage

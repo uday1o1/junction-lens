@@ -42,6 +42,30 @@ def canonical_json_bytes(value: object) -> bytes:
     ).encode("utf-8")
 
 
+def _strict_json_object(payload: bytes, label: str) -> Mapping[str, Any]:
+    def reject_duplicates(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in items:
+            if key in result:
+                raise RegistryError(f"duplicate JSON object key in {label}: {key}")
+            result[key] = item
+        return result
+
+    try:
+        value = json.loads(
+            payload,
+            object_pairs_hook=reject_duplicates,
+            parse_constant=lambda item: (_ for _ in ()).throw(
+                RegistryError(f"nonfinite JSON constant in {label}: {item}")
+            ),
+        )
+    except json.JSONDecodeError as error:
+        raise RegistryError(f"{label} contains invalid JSON") from error
+    if not isinstance(value, dict):
+        raise RegistryError(f"{label} must be an object")
+    return cast(Mapping[str, Any], value)
+
+
 def _sha256_file(path: Path) -> tuple[str, int]:
     digest = hashlib.sha256()
     size = 0
@@ -199,7 +223,6 @@ class ContentAddressedStore:
         if not source.is_file():
             raise RegistryError("artifact source must be a regular file")
         payload_sha256, byte_size = _sha256_file(source)
-        target = self._install_file(source, payload_sha256, byte_size)
         for parent in parents:
             _validate_sha256(parent, "parent hash")
         manifest: Mapping[str, Any] = {
@@ -209,7 +232,7 @@ class ContentAddressedStore:
                 "sha256": payload_sha256,
                 "byte_size": byte_size,
                 "media_type": media_type,
-                "relative_uri": target.relative_to(self.root).as_posix(),
+                "relative_uri": f"objects/sha256/{payload_sha256[:2]}/{payload_sha256[2:]}",
             },
             "parents": sorted(set(parents)),
             "license_id": license_id,
@@ -218,7 +241,12 @@ class ContentAddressedStore:
         errors = sorted(self._validator.iter_errors(manifest), key=lambda error: list(error.path))
         if errors:
             raise RegistryError(f"artifact manifest failed schema validation: {errors[0].message}")
-        manifest_sha256, _, _ = self._install_bytes(canonical_json_bytes(manifest))
+        try:
+            manifest_bytes = canonical_json_bytes(manifest)
+        except (TypeError, ValueError) as error:
+            raise RegistryError(f"artifact manifest is not canonical JSON: {error}") from error
+        self._install_file(source, payload_sha256, byte_size)
+        manifest_sha256, _, _ = self._install_bytes(manifest_bytes)
         return ArtifactReceipt(
             kind=kind,
             payload_sha256=payload_sha256,
@@ -262,13 +290,7 @@ class ContentAddressedStore:
         self._verify_existing(path, manifest_sha256, path.stat().st_size)
         if path.stat().st_size > _MAX_MANIFEST_BYTES:
             raise RegistryError("artifact manifest exceeds the byte limit")
-        try:
-            value = json.loads(path.read_bytes())
-        except json.JSONDecodeError as error:
-            raise RegistryError("artifact manifest contains invalid JSON") from error
-        if not isinstance(value, dict):
-            raise RegistryError("artifact manifest must be an object")
-        manifest = cast(Mapping[str, Any], value)
+        manifest = _strict_json_object(path.read_bytes(), "artifact manifest")
         errors = sorted(self._validator.iter_errors(manifest), key=lambda error: list(error.path))
         if errors:
             raise RegistryError(f"artifact manifest failed schema validation: {errors[0].message}")
