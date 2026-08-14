@@ -146,6 +146,47 @@ def _validate_adapter_lock(root: Path, dataset: Mapping[str, Any]) -> None:
         raise LockVerificationError("OpenLane camera mappings differ from their dataset lock")
 
 
+def _validate_split_policy_lock(root: Path, dataset: Mapping[str, Any]) -> None:
+    split_lock = dataset.get("split_policy")
+    if not isinstance(split_lock, dict) or set(split_lock) != {
+        "committed_manifest",
+        "committed_manifest_sha256",
+        "config_sha256",
+        "version",
+    }:
+        raise LockVerificationError("dataset split-policy lock is incomplete")
+    if split_lock.get("version") != "v1":
+        raise LockVerificationError("dataset split-policy version differs from V1")
+    policy_path = root / "configs/data/openlane-v2-v2.1.split-v1.yaml"
+    observed_policy = hashlib.sha256(policy_path.read_bytes()).hexdigest()
+    expected_policy = _require_hash(
+        split_lock.get("config_sha256"),
+        _SHA256,
+        "OpenLane split-policy config sha256",
+    )
+    if observed_policy != expected_policy:
+        raise LockVerificationError("OpenLane split policy differs from its dataset lock")
+    manifest_relative = split_lock.get("committed_manifest")
+    if manifest_relative != "configs/data/openlane-v2-v2.1.split-v1.json":
+        raise LockVerificationError("OpenLane committed split-manifest path differs from V1")
+    manifest_path = root / str(manifest_relative)
+    expected_manifest = split_lock.get("committed_manifest_sha256")
+    if expected_manifest is None:
+        if manifest_path.exists() or manifest_path.is_symlink():
+            raise LockVerificationError("OpenLane split manifest exists without a locked hash")
+        return
+    locked_manifest = _require_hash(
+        expected_manifest,
+        _SHA256,
+        "OpenLane committed split-manifest sha256",
+    )
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise LockVerificationError("locked OpenLane split manifest is missing")
+    observed_manifest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    if observed_manifest != locked_manifest:
+        raise LockVerificationError("OpenLane committed split manifest differs from its lock")
+
+
 def _validate_images(payload: Mapping[str, Any]) -> None:
     if payload.get("platform") != "linux/amd64":
         raise LockVerificationError("image lock must target linux/amd64")
@@ -213,6 +254,7 @@ def validate_lock_set(root: Path) -> None:
     dataset = _load_yaml(root / "configs/data/openlane-v2-v2.1.lock.yaml")
     _validate_dataset(dataset)
     _validate_adapter_lock(root, dataset)
+    _validate_split_policy_lock(root, dataset)
     _validate_images(_load_yaml(root / "containers/images.lock"))
     _cmake_sources(root / "cmake/dependencies.cmake")
 

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://junctionlens.local/schemas/artifact-manifest-v1.schema.json",
+  "title": "JunctionLens artifact manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "license_id", "metadata", "parents", "payload", "schema_version"],
+  "properties": {
+    "schema_version": {
+      "const": "junctionlens.artifact-manifest.v1"
+    },
+    "kind": {
+      "enum": [
+        "dataset_lock",
+        "frame_manifest",
+        "split_manifest",
+        "run_configuration",
+        "checkpoint",
+        "calibrator",
+        "onnx_model",
+        "execution_provider_trace",
+        "prediction_bundle",
+        "match_map",
+        "frame_kpi_table",
+        "segment_kpi_table",
+        "slice_table",
+        "comparison",
+        "release_decision",
+        "counterexample_bundle",
+        "benchmark",
+        "profiler_capture",
+        "model_card",
+        "evidence_report"
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["byte_size", "media_type", "relative_uri", "sha256"],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "relative_uri": {
+          "type": "string",
+          "pattern": "^objects/sha256/[0-9a-f]{2}/[0-9a-f]{62}$"
+        }
+      }
+    },
+    "parents": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "license_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}

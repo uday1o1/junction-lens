@@ -45,3 +45,15 @@ def test_adapter_lock_rejects_seeded_config_hash_drift(tmp_path: Path) -> None:
     dataset = verify._load_yaml(source_root / "configs/data/openlane-v2-v2.1.lock.yaml")
     with pytest.raises(verify.LockVerificationError, match="config differs"):
         verify._validate_adapter_lock(tmp_path, dataset)
+
+
+def test_split_policy_lock_rejects_seeded_config_hash_drift(tmp_path: Path) -> None:
+    """A changed split algorithm cannot retain the V1 reproducibility identity."""
+    source_root = Path.cwd()
+    policy_relative = Path("configs/data/openlane-v2-v2.1.split-v1.yaml")
+    copied_policy = tmp_path / policy_relative
+    copied_policy.parent.mkdir(parents=True)
+    copied_policy.write_bytes((source_root / policy_relative).read_bytes() + b"# drift\n")
+    dataset = verify._load_yaml(source_root / "configs/data/openlane-v2-v2.1.lock.yaml")
+    with pytest.raises(verify.LockVerificationError, match="split policy differs"):
+        verify._validate_split_policy_lock(tmp_path, dataset)

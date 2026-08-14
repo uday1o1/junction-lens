@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
+from collections.abc import Mapping
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, Any, cast
 
@@ -17,9 +20,22 @@ from junctionlens.data.license import (
     load_registration,
     register_dataset,
 )
+from junctionlens.data.manifests import (
+    ManifestError,
+    audit_split_manifest,
+    freeze_split_manifest,
+    load_split_manifest,
+    load_split_policy,
+    split_records_from_frame_metadata,
+    verify_frame_records,
+    write_frame_records,
+    write_immutable_split_manifest,
+)
 from junctionlens.data.openlane import OpenLaneAdapter, OpenLaneAdapterError
 from junctionlens.data.parity import AdapterParityError, verify_official_parity
 from junctionlens.evaluator.official import EvaluationError
+from junctionlens.registry import ContentAddressedStore, RegistryError
+from junctionlens.registry.store import canonical_json_bytes
 
 data_app = typer.Typer(help="Acknowledge, register, audit, and verify licensed datasets.")
 
@@ -33,7 +49,9 @@ def _fail(error: Exception) -> None:
     raise typer.Exit(code=2) from error
 
 
-def _registered_root(dataset_id: str, profile: str, root: Path | None) -> Path:
+def _registered_dataset(
+    dataset_id: str, profile: str, root: Path | None
+) -> tuple[Path, Mapping[str, Any]]:
     registration = load_registration(Path.cwd().resolve(), dataset_id, profile)
     selected_root = root
     if selected_root is None:
@@ -47,7 +65,18 @@ def _registered_root(dataset_id: str, profile: str, root: Path | None) -> Path:
         raise DatasetRegistrationError(
             "selected root differs from the checksum-verified registration"
         )
-    return selected_root
+    return selected_root, registration
+
+
+def _registered_root(dataset_id: str, profile: str, root: Path | None) -> Path:
+    return _registered_dataset(dataset_id, profile, root)[0]
+
+
+def _store(artifact_root: Path) -> ContentAddressedStore:
+    return ContentAddressedStore(
+        artifact_root,
+        Path.cwd().resolve() / "schemas/artifact-manifest-v1.schema.json",
+    )
 
 
 @data_app.command("acknowledge")
@@ -217,3 +246,175 @@ def verify_adapter_command(
         _fail(error)
         return
     _emit(payload)
+
+
+@data_app.command("manifest")
+def manifest_command(
+    dataset_id: Annotated[str, typer.Option("--dataset")] = "openlane-v2-v2.1",
+    profile: Annotated[str, typer.Option("--profile")] = "full",
+    root: Annotated[
+        Path | None,
+        typer.Option("--root", exists=True, file_okay=False, resolve_path=True),
+    ] = None,
+    config_path: Annotated[
+        Path,
+        typer.Option("--config", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.adapter.yaml"),
+    artifact_root: Annotated[
+        Path,
+        typer.Option("--artifact-root", file_okay=False, resolve_path=True),
+    ] = Path("artifacts"),
+) -> None:
+    """Stream registered frame identities into an immutable content artifact."""
+    try:
+        selected_root, registration = _registered_dataset(dataset_id, profile, root)
+        store = _store(artifact_root)
+        with tempfile.TemporaryDirectory(prefix="frame-manifest-", dir=store.staging_root) as temp:
+            frame_records = Path(temp) / "frames.ndjson"
+            metadata = write_frame_records(
+                OpenLaneAdapter(selected_root, config_path),
+                profile,
+                frame_records,
+                registration,
+            )
+            receipt = store.put_file(
+                frame_records,
+                kind="frame_manifest",
+                media_type="application/x-ndjson",
+                license_id="CC-BY-NC-SA-4.0",
+                metadata=metadata,
+            )
+    except (
+        DatasetRegistrationError,
+        ManifestError,
+        OpenLaneAdapterError,
+        OSError,
+        RegistryError,
+        TypeError,
+        ValueError,
+        yaml.YAMLError,
+    ) as error:
+        _fail(error)
+        return
+    _emit(
+        {
+            "schema_version": "junctionlens.frame-manifest-receipt.v1",
+            "state": "ACCEPTED",
+            "artifact_manifest_sha256": receipt.manifest_sha256,
+            "frame_records_sha256": receipt.payload_sha256,
+            "frame_count": metadata["frame_count"],
+            "segment_count": metadata["segment_count"],
+            "split_segment_counts": metadata["split_segment_counts"],
+        }
+    )
+
+
+@data_app.command("freeze-splits")
+def freeze_splits_command(
+    frame_manifest_sha256: Annotated[
+        str,
+        typer.Option("--frame-manifest-sha256"),
+    ],
+    artifact_root: Annotated[
+        Path,
+        typer.Option("--artifact-root", file_okay=False, resolve_path=True),
+    ] = Path("artifacts"),
+    policy_path: Annotated[
+        Path,
+        typer.Option("--policy", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.split-v1.yaml"),
+    export_path: Annotated[
+        Path | None,
+        typer.Option("--export", dir_okay=False, resolve_path=True),
+    ] = None,
+) -> None:
+    """Freeze exact V1 partitions from a verified full-profile frame manifest."""
+    try:
+        store = _store(artifact_root)
+        frame_artifact = store.read_manifest(frame_manifest_sha256)
+        if frame_artifact.get("kind") != "frame_manifest":
+            raise ManifestError("source artifact is not a frame manifest")
+        raw_metadata = frame_artifact.get("metadata")
+        raw_payload = frame_artifact.get("payload")
+        if not isinstance(raw_metadata, dict) or not isinstance(raw_payload, dict):
+            raise ManifestError("frame artifact has invalid manifest fields")
+        metadata = cast(Mapping[str, Any], raw_metadata)
+        payload = cast(Mapping[str, Any], raw_payload)
+        policy = load_split_policy(policy_path)
+        verify_frame_records(store.object_path(str(payload.get("sha256"))), metadata)
+        records = split_records_from_frame_metadata(metadata, policy)
+        source_registration = metadata.get("source_registration")
+        if not isinstance(source_registration, dict):
+            raise ManifestError("frame manifest lacks source registration evidence")
+        split_manifest = freeze_split_manifest(
+            records,
+            policy,
+            source_frame_manifest_sha256=frame_manifest_sha256,
+            source_frame_records_sha256=str(payload.get("sha256")),
+            source_dataset_manifest_sha256=str(source_registration.get("manifest_sha256")),
+        )
+        audit = audit_split_manifest(split_manifest, policy)
+        split_payload = canonical_json_bytes(split_manifest) + b"\n"
+        receipt = store.put_bytes(
+            split_payload,
+            kind="split_manifest",
+            media_type="application/json",
+            license_id="CC-BY-NC-SA-4.0",
+            parents=(frame_manifest_sha256,),
+            metadata={
+                "schema_version": "junctionlens.split-manifest-artifact-metadata.v1",
+                "policy_id": policy.policy_id,
+                "segment_count": audit.segment_count,
+                "partition_counts": dict(audit.partition_counts),
+                "segment_catalog_sha256": audit.segment_catalog_sha256,
+            },
+        )
+        export_sha256 = None
+        if export_path is not None:
+            export_sha256 = write_immutable_split_manifest(export_path, split_manifest)
+            if export_sha256 != receipt.payload_sha256:
+                raise ManifestError("registry and exported split payload hashes differ")
+    except (ManifestError, OSError, RegistryError, TypeError, ValueError) as error:
+        _fail(error)
+        return
+    response: dict[str, Any] = {
+        "schema_version": "junctionlens.split-freeze-receipt.v1",
+        "state": audit.state,
+        "artifact_manifest_sha256": receipt.manifest_sha256,
+        "split_manifest_sha256": receipt.payload_sha256,
+        "segment_count": audit.segment_count,
+        "partition_counts": dict(audit.partition_counts),
+        "overlap_count": audit.overlap_count,
+        "segment_catalog_sha256": audit.segment_catalog_sha256,
+    }
+    if export_sha256 is not None:
+        response["export_sha256"] = export_sha256
+    _emit(response)
+
+
+@data_app.command("audit-splits")
+def audit_splits_command(
+    manifest_path: Annotated[
+        Path,
+        typer.Option("--manifest", exists=True, dir_okay=False, resolve_path=True),
+    ],
+    policy_path: Annotated[
+        Path,
+        typer.Option("--policy", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/data/openlane-v2-v2.1.split-v1.yaml"),
+) -> None:
+    """Independently reject split overlap, count, provenance, and hash defects."""
+    try:
+        audit = audit_split_manifest(
+            load_split_manifest(manifest_path),
+            load_split_policy(policy_path),
+        )
+    except (ManifestError, OSError, TypeError, ValueError) as error:
+        _fail(error)
+        return
+    _emit(
+        {
+            "schema_version": "junctionlens.split-audit-report.v1",
+            **asdict(audit),
+        }
+    )

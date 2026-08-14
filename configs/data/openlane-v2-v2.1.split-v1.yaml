@@ -1,0 +1,33 @@
+schema_version: junctionlens.openlane-split-policy.v1
+policy_id: openlane-v2-v2.1-split-v1
+dataset_id: openlane-v2-v2.1
+dataset_version: "2.1"
+source_profile: full
+source_split: train
+expected_segment_count: 700
+algorithm: sequential-hamilton-sha256-v1
+hash_domain: junctionlens/openlane-v2-v2.1/split-v1
+legal_assignment_fields:
+  - segment_id
+  - source_domain
+stratification_fields:
+  - source_domain
+forbidden_assignment_fields:
+  - annotations
+  - images
+  - label_statistics
+  - model_outputs
+  - partition_statistics
+allocations:
+  - id: model_training
+    count: 350
+    purpose: model-fitting-only
+  - id: model_selection
+    count: 80
+    purpose: architecture-and-checkpoint-selection
+  - id: calibration
+    count: 70
+    purpose: probability-and-geometry-scale-calibration
+  - id: internal_holdout
+    count: 200
+    purpose: frozen-one-shot-release-comparison
