@@ -38,6 +38,7 @@ Repository commands:
   test-integration-evidence
   test-integration-e0
   test-integration-gate
+  test-integration-topology
   test-web
   build-evaluator [--check-lock]
   test-evaluator
@@ -49,6 +50,7 @@ Repository commands:
   model-parity
   model-providers
   model-benchmark
+  model-topology
   verify-m0-3-local
   verify-m1-1
   verify-m1-2
@@ -61,6 +63,7 @@ Repository commands:
   verify-m3-3
   verify-m4-1-local
   verify-m4-2-local
+  verify-m5-1-local
 EOF
 }
 
@@ -208,6 +211,12 @@ case "$JL_COMMAND" in
       "$JL_ROOT/tests/integration/test_gate_cli.py" \
       "$@"
     ;;
+  test-integration-topology)
+    uv run --locked pytest \
+      "$JL_ROOT/tests/unit/test_learned_topology.py" \
+      "$JL_ROOT/tests/integration/test_topology_cli.py" \
+      "$@"
+    ;;
   test-web)
     pnpm run typecheck:web
     pnpm run test:contract
@@ -235,6 +244,9 @@ case "$JL_COMMAND" in
     ;;
   model-benchmark)
     uv run --locked junctionlens model benchmark-m0 "$@"
+    ;;
+  model-topology)
+    uv run --locked junctionlens model verify-topology "$@"
     ;;
   verify-m0-1)
     uv lock --check
@@ -324,6 +336,10 @@ case "$JL_COMMAND" in
   verify-m4-2-local)
     "$0" verify-m4-1-local
     "$0" test-integration-gate
+    ;;
+  verify-m5-1-local)
+    "$0" verify-m4-2-local
+    "$0" test-integration-topology
     ;;
   -h|--help|help)
     usage

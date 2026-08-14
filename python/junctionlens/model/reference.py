@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 from torch import Tensor, nn
@@ -306,7 +307,7 @@ class ReferenceNodeModel(nn.Module):  # type: ignore[misc]
         self.area_scales = nn.Linear(hidden, architecture.area_points * 3)
         self.area_embedding = nn.Linear(hidden, architecture.track_embedding_dimension)
 
-    def forward(
+    def decode_queries(
         self,
         images: Tensor,
         camera_valid: Tensor,
@@ -314,7 +315,8 @@ class ReferenceNodeModel(nn.Module):  # type: ignore[misc]
         t_vehicle_camera: Tensor,
         ego_motion_previous_to_current: Tensor,
         temporal_valid: Tensor,
-    ) -> tuple[Tensor, ...]:
+    ) -> tuple[Tensor, Tensor, Tensor]:
+        """Encode the current frame and return the shared type-specific query features."""
         del ego_motion_previous_to_current, temporal_valid
         current = self.profile.input.current_timestamp_index
         batch, cameras = images.shape[0], images.shape[2]
@@ -327,8 +329,12 @@ class ReferenceNodeModel(nn.Module):  # type: ignore[misc]
             intrinsics[:, current],
             t_vehicle_camera[:, current],
         )
-        lane, traffic, area = self.decoder(bev)
+        return cast(tuple[Tensor, Tensor, Tensor], self.decoder(bev))
+
+    def node_outputs(self, lane: Tensor, traffic: Tensor, area: Tensor) -> tuple[Tensor, ...]:
+        """Apply every shared E0 node head without hiding decoder features from E1."""
         architecture = self.profile.architecture
+        batch = lane.shape[0]
         lane_geometry = self.lane_geometry(lane).reshape(
             batch, architecture.lane_queries, 3, architecture.lane_points, 3
         )
@@ -367,6 +373,25 @@ class ReferenceNodeModel(nn.Module):  # type: ignore[misc]
             + 1.0e-4,
             functional.normalize(self.area_embedding(area), dim=-1),
         )
+
+    def forward(
+        self,
+        images: Tensor,
+        camera_valid: Tensor,
+        intrinsics: Tensor,
+        t_vehicle_camera: Tensor,
+        ego_motion_previous_to_current: Tensor,
+        temporal_valid: Tensor,
+    ) -> tuple[Tensor, ...]:
+        lane, traffic, area = self.decode_queries(
+            images,
+            camera_valid,
+            intrinsics,
+            t_vehicle_camera,
+            ego_motion_previous_to_current,
+            temporal_valid,
+        )
+        return self.node_outputs(lane, traffic, area)
 
 
 def e0_outputs_by_name(outputs: Sequence[Tensor]) -> dict[str, Tensor]:

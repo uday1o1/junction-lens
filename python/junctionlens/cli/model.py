@@ -21,11 +21,16 @@ from junctionlens.model.e0_training import (
     run_e0_training,
     select_e0_checkpoint,
 )
+from junctionlens.model.e1_profile import load_e1_profile
 from junctionlens.model.export import ModelExportError, export_model
 from junctionlens.model.overfit import MicroOverfitError, run_micro_overfit
 from junctionlens.model.parity import ParityError, run_parity
 from junctionlens.model.profile import load_m0_profile
 from junctionlens.model.providers import ProviderProbeError, run_provider_probe
+from junctionlens.model.topology_diagnostic import (
+    TopologyDiagnosticError,
+    run_topology_diagnostic,
+)
 
 model_app = typer.Typer(help="Prove model training and deployment contracts.", no_args_is_help=True)
 
@@ -181,6 +186,31 @@ def finalize_e0_command(
             load_e0_profile(profile_path), run_roots, measured_evidence, output_root
         )
     except (E0ArtifactError, OSError, TypeError, ValueError) as error:
+        _fail(error)
+        return
+    _print(result)
+
+
+@model_app.command("verify-topology")
+def verify_topology_command(
+    output: Annotated[
+        Path,
+        typer.Option("--output", dir_okay=False, resolve_path=True),
+    ] = Path("artifacts/m5/topology-diagnostic.json"),
+    base_profile_path: Annotated[
+        Path,
+        typer.Option("--base-profile", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/model/e0-independent-v1.yaml"),
+    profile_path: Annotated[
+        Path,
+        typer.Option("--profile", exists=True, dir_okay=False, resolve_path=True),
+    ] = Path("configs/model/e1-joint-v1.yaml"),
+) -> None:
+    """Train and verify the frozen oracle-node and predicted-node topology modes."""
+    try:
+        base = load_e0_profile(base_profile_path)
+        result = run_topology_diagnostic(base, load_e1_profile(profile_path, base), output)
+    except (TopologyDiagnosticError, OSError, RuntimeError, ValueError) as error:
         _fail(error)
         return
     _print(result)

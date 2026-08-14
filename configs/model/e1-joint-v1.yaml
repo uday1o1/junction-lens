@@ -1,0 +1,19 @@
+schema_version: junctionlens.e1-profile.v1
+experiment_id: E1-joint
+base_profile_sha256: 78b557ca77f003e667a4f7b36effff612ed470a25ee6f446d4bc5dc2757312f2
+topology:
+  edge_dimension: 64
+  geometry_hidden_dimension: 64
+  allow_lane_self_edges: false
+  front_center_camera_index: 0
+  lane_successor_loss_weight: 3.0
+  control_lane_loss_weight: 5.0
+  endpoint_continuity_loss_weight: 1.0
+  positive_weight_partition: model_training
+diagnostics:
+  modes: [oracle-nodes, predicted-nodes]
+  seed: 20260813
+  maximum_steps: 5000
+  oracle_lane_successor_f1_minimum: 0.95
+  oracle_control_lane_f1_minimum: 0.95
+  prediction_threshold: 0.5

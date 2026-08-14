@@ -28,5 +28,7 @@ See [Visual and statistical data audit](docs/data-audit.md) for private calibrat
 
 See [Acceptance charter and release decisions](docs/acceptance-charter.md) for the pre-holdout policy freeze, paired bootstrap, stable reason codes, and immutable decision workflow.
 
+See [E1 learned topology](docs/e1-learned-topology.md) for the directed edge heads, canonical matrix ordering, topology objective, and oracle-node versus predicted-node diagnostics.
+
 The official metric path runs the untouched OpenLane-V2 v2.1 evaluator in a reproducible restricted Python 3.8 image.
 See [Official evaluator compatibility](docs/evaluator-compatibility.md) for its trust boundary, exact build command, and repository-owned corruption evidence.
