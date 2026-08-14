@@ -266,7 +266,7 @@ def build_manifest(root: Path, *, require_clean: bool = True) -> dict[str, Any]:
             _validate_symlink(root, relative, target)
             entries.append({"path": path_text, "mode": mode, "type": "symlink", "target": target})
             continue
-        file_status = local.stat(follow_symlinks=False)
+        file_status = local.lstat()
         if not stat.S_ISREG(file_status.st_mode):
             raise SourceBundleError(f"tracked path is not a regular file: {path_text}")
         entries.append(
