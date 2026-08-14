@@ -9,9 +9,13 @@
     "pnpm": "10.17.1"
   },
   "scripts": {
-    "format:check": "prettier --check package.json pnpm-workspace.yaml web",
+    "build:web": "vite build web",
+    "format:check": "prettier --check package.json pnpm-workspace.yaml eslint.config.mjs web",
+    "lint:web": "eslint web/src web/tests web/e2e web/*.ts",
     "lock:check": "pnpm install --frozen-lockfile --ignore-scripts",
     "test:contract": "vitest run web/tests/contract-ids.test.ts",
+    "test:web:browser": "playwright test --config web/playwright.config.ts",
+    "test:web:unit": "vitest run --config web/vitest.config.ts --coverage",
     "typecheck:web": "tsc --noEmit -p web/tsconfig.json"
   },
   "dependencies": {
@@ -21,11 +25,24 @@
     "vite": "7.1.3"
   },
   "devDependencies": {
+    "@eslint/js": "9.34.0",
+    "@playwright/test": "1.62.1",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.4",
+    "@types/node": "22.18.13",
     "@types/react": "19.1.10",
     "@types/react-dom": "19.1.7",
+    "@vitest/coverage-v8": "3.2.4",
+    "axe-core": "4.13.0",
     "eslint": "9.34.0",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.11.0",
+    "jsdom": "30.0.1",
     "prettier": "3.6.2",
     "typescript": "5.8.3",
+    "typescript-eslint": "8.67.0",
     "vitest": "3.2.4"
   }
 }

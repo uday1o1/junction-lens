@@ -33,6 +33,14 @@ def serve_command(
         Path,
         typer.Option("--schema", exists=True, dir_okay=False),
     ] = Path("schemas/artifact-manifest-v1.schema.json"),
+    web_root: Annotated[
+        Path,
+        typer.Option("--web-root", file_okay=False),
+    ] = Path("web/dist"),
+    api_only: Annotated[
+        bool,
+        typer.Option("--api-only", help="Serve only the read API without the bundled viewer."),
+    ] = False,
     open_browser: Annotated[bool, typer.Option("--open-browser")] = False,
     check: Annotated[
         bool,
@@ -46,7 +54,11 @@ def serve_command(
         from junctionlens.api.repository import EvidenceReadError
         from junctionlens.api.server import check_service, run_service
 
-        config = ServiceConfig(artifact_root=artifact_root, schema_path=schema)
+        config = ServiceConfig(
+            artifact_root=artifact_root,
+            schema_path=schema,
+            web_root=None if api_only else web_root,
+        )
         status = check_service(config, host=host, port=port)
         if check:
             if human_requested(human):

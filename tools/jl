@@ -81,6 +81,7 @@ Repository commands:
   verify-m8-2-local
   verify-m8-3-local
   verify-m9-1
+  verify-m9-2
 EOF
 }
 
@@ -285,8 +286,12 @@ case "$JL_COMMAND" in
       "$@"
     ;;
   test-web)
+    pnpm run lint:web
     pnpm run typecheck:web
     pnpm run test:contract
+    pnpm run test:web:unit
+    pnpm run build:web
+    pnpm run test:web:browser
     ;;
   build-evaluator)
     uv run --locked python scripts/containers/build_evaluator.py "$@"
@@ -445,6 +450,10 @@ case "$JL_COMMAND" in
   verify-m9-1)
     "$0" verify-m8-3-local
     "$0" test-integration-app
+    ;;
+  verify-m9-2)
+    "$0" verify-m9-1
+    "$0" test-web
     ;;
   -h|--help|help)
     usage

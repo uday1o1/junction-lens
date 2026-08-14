@@ -28,6 +28,8 @@ def check_service(config: ServiceConfig, *, host: str, port: int) -> Mapping[str
     if not 1 <= port <= 65535:
         raise ServeError("service port must be between 1 and 65535")
     artifact_count, run_count = EvidenceRepository(config).counts()
+    if config.web_root is not None:
+        create_app(config)
     return {
         "schema_version": "junctionlens.serve-status.v1",
         "state": "READY",
@@ -36,6 +38,7 @@ def check_service(config: ServiceConfig, *, host: str, port: int) -> Mapping[str
         "artifact_count": artifact_count,
         "run_count": run_count,
         "read_only": True,
+        "viewer_available": config.web_root is not None,
     }
 
 
@@ -53,7 +56,8 @@ def run_service(
     except ImportError as error:
         raise ServeError("serve requires the pinned service dependency set") from error
     if open_browser:
-        url = f"http://{host}:{port}/api/v1/health"
+        suffix = "/" if config.web_root is not None else "/api/v1/health"
+        url = f"http://{host}:{port}{suffix}"
         timer = threading.Timer(0.75, webbrowser.open, args=(url,))
         timer.daemon = True
         timer.start()

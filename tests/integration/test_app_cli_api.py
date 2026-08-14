@@ -111,7 +111,11 @@ def test_read_only_api_serves_paginated_registered_evidence(tmp_path: Path) -> N
     assert health.status_code == 200
     assert health.json()["state"] == "READY"
     assert health.headers["x-content-type-options"] == "nosniff"
-    assert health.headers["content-security-policy"].startswith("default-src 'none'")
+    policy = health.headers["content-security-policy"]
+    assert "default-src 'self'" in policy
+    assert "script-src 'self'" in policy
+    assert "object-src 'none'" in policy
+    assert "frame-ancestors 'none'" in policy
 
     first_page = client.get("/api/v1/artifacts", params={"limit": 2})
     second_page = client.get("/api/v1/artifacts", params={"limit": 2, "offset": 2})
@@ -176,6 +180,117 @@ def test_api_errors_are_stable_and_all_routes_are_read_only(tmp_path: Path) -> N
     assert mutation.json()["error"]["code"] == "API_METHOD_NOT_ALLOWED"
 
 
+def _scene_graph(prefix: str) -> dict[str, Any]:
+    return {
+        "lanes": [
+            {
+                "node_id": f"{prefix}-lane",
+                "points": [{"x": 0.0, "y": 0.0}, {"x": 10.0, "y": 1.0}],
+                "confidence": 0.9,
+            }
+        ],
+        "controls": [
+            {
+                "node_id": f"{prefix}-control",
+                "x": 5.0,
+                "y": -2.0,
+                "control_type": "traffic_light",
+                "state": "red",
+                "confidence": 0.8,
+            }
+        ],
+        "edges": [
+            {
+                "edge_id": f"{prefix}-edge",
+                "edge_type": "control_applies_to_lane",
+                "source_node_id": f"{prefix}-control",
+                "target_node_id": f"{prefix}-lane",
+                "confidence": 0.75,
+            }
+        ],
+    }
+
+
+def test_scene_api_requires_persisted_parent_and_serves_bundled_web_app(
+    tmp_path: Path,
+) -> None:
+    artifact_root, decision_receipt, _, image_receipt, decision = _registered_evidence(tmp_path)
+    registry = EvidenceRegistry(artifact_root, SCHEMA)
+    bundle = {
+        "schema_version": "junctionlens.scene-bundle.v1",
+        "title": "Synthetic scene",
+        "decision_manifest_sha256": decision_receipt.manifest_sha256,
+        "license_notice": "Synthetic unrestricted cameras",
+        "frames": [
+            {
+                "frame_id": "frame-00",
+                "segment_id": "segment-a",
+                "timestamp_ns": "1725000000000000000",
+                "cameras": [
+                    {
+                        "slot": "front-center",
+                        "label": "Front center",
+                        "artifact_manifest_sha256": image_receipt.manifest_sha256,
+                        "restriction_reason": None,
+                    },
+                    {
+                        "slot": "front-left",
+                        "label": "Front left",
+                        "artifact_manifest_sha256": None,
+                        "restriction_reason": "Licensed image excluded.",
+                    },
+                ],
+                "ground_truth": _scene_graph("truth"),
+                "baseline": _scene_graph("baseline"),
+                "candidate": _scene_graph("candidate"),
+            }
+        ],
+    }
+    scene_receipt = registry.put_bytes(
+        canonical_json_bytes(bundle) + b"\n",
+        kind="counterexample_bundle",
+        media_type="application/vnd.junctionlens.scene-bundle+json",
+        license_id="CC0-1.0",
+        metadata={"frame_count": 1},
+        parents=(decision_receipt.manifest_sha256, image_receipt.manifest_sha256),
+    )
+    invalid_receipt = registry.put_bytes(
+        canonical_json_bytes(bundle) + b" ",
+        kind="counterexample_bundle",
+        media_type="application/vnd.junctionlens.scene-bundle+json",
+        license_id="CC0-1.0",
+        metadata={"frame_count": 1, "invalid_parent_fixture": True},
+        parents=(image_receipt.manifest_sha256,),
+    )
+    web_root = tmp_path / "web-dist"
+    (web_root / "assets").mkdir(parents=True)
+    (web_root / "index.html").write_text("<!doctype html><title>Viewer</title>", encoding="utf-8")
+    client = TestClient(
+        create_app(
+            ServiceConfig(
+                artifact_root=artifact_root,
+                schema_path=SCHEMA,
+                web_root=web_root,
+            )
+        ),
+        base_url="http://127.0.0.1",
+    )
+
+    scene = client.get(f"/api/v1/scenes/{scene_receipt.manifest_sha256}")
+    invalid = client.get(f"/api/v1/scenes/{invalid_receipt.manifest_sha256}")
+    index = client.get("/")
+    fallback = client.get("/scene/selected")
+
+    assert scene.status_code == 200
+    assert scene.json()["bundle"] == bundle
+    assert scene.json()["decision"] == decision
+    assert invalid.status_code == 409
+    assert "immutable parent" in invalid.json()["error"]["message"]
+    assert index.status_code == fallback.status_code == 200
+    assert index.text == fallback.text
+    assert index.headers["content-security-policy"].find("script-src 'self'") >= 0
+
+
 def test_public_cli_report_and_service_paths_are_end_to_end(tmp_path: Path) -> None:
     artifact_root, decision_receipt, _, _, _ = _registered_evidence(tmp_path)
     runner = CliRunner()
@@ -224,6 +339,7 @@ def test_public_cli_report_and_service_paths_are_end_to_end(tmp_path: Path) -> N
             str(artifact_root),
             "--schema",
             str(SCHEMA),
+            "--api-only",
             "--check",
         ],
     )
@@ -238,6 +354,7 @@ def test_public_cli_report_and_service_paths_are_end_to_end(tmp_path: Path) -> N
             str(artifact_root),
             "--schema",
             str(SCHEMA),
+            "--api-only",
             "--host",
             "0.0.0.0",  # noqa: S104 - seeded rejection case
             "--check",

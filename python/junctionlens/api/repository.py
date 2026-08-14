@@ -21,6 +21,7 @@ from junctionlens.api.models import (
     ArtifactSummary,
     PageInfo,
     RunSummary,
+    SceneBundle,
     ServiceConfig,
 )
 from junctionlens.registry.store import ContentAddressedStore, RegistryError, canonical_json_bytes
@@ -29,6 +30,7 @@ _SHA256_LENGTH = 64
 _DECISION_MEDIA_TYPE = "application/vnd.junctionlens.gate-decision+json"
 _PARQUET_MEDIA_TYPE = "application/vnd.apache.parquet"
 _IMAGE_MEDIA_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
+_SCENE_MEDIA_TYPE = "application/vnd.junctionlens.scene-bundle+json"
 
 
 class EvidenceReadError(RuntimeError):
@@ -271,6 +273,43 @@ class EvidenceRepository:
         items = tuple(self._artifact_summary(row) for row in rows)
         return items, PageInfo(offset=offset, limit=limit, returned=len(items), total=total)
 
+    def list_artifacts_by_kind_and_media(
+        self,
+        offset: int,
+        limit: int,
+        *,
+        kind: str,
+        media_type: str,
+    ) -> tuple[tuple[ArtifactSummary, ...], PageInfo]:
+        connection = self._connect()
+        try:
+            parameters = [kind, media_type]
+            count_row = connection.execute(
+                """
+                SELECT COUNT(*) FROM artifact_summary
+                WHERE kind = ? AND media_type = ?
+                """,
+                parameters,
+            ).fetchone()
+            if count_row is None:
+                raise EvidenceReadError("artifact count query returned no row")
+            total = int(count_row[0])
+            rows = connection.execute(
+                """
+                SELECT manifest_sha256, kind, payload_sha256, payload_byte_size,
+                       media_type, license_id, metadata_json
+                FROM artifact_summary WHERE kind = ? AND media_type = ?
+                ORDER BY manifest_sha256 LIMIT ? OFFSET ?
+                """,
+                [*parameters, limit, offset],
+            ).fetchall()
+        except duckdb.Error as error:
+            raise EvidenceReadError("artifact index cannot be read") from error
+        finally:
+            connection.close()
+        items = tuple(self._artifact_summary(row) for row in rows)
+        return items, PageInfo(offset=offset, limit=limit, returned=len(items), total=total)
+
     @staticmethod
     def _artifact_summary(row: tuple[object, ...]) -> ArtifactSummary:
         metadata = _strict_json_object(str(row[6]).encode(), "artifact metadata")
@@ -398,6 +437,30 @@ class EvidenceRepository:
                 total=total,
             ),
         )
+
+    def scene_bundle(self, manifest_sha256: str) -> tuple[SceneBundle, dict[str, JsonValue]]:
+        artifact = self.artifact(manifest_sha256)
+        if artifact.kind != "counterexample_bundle" or artifact.media_type != _SCENE_MEDIA_TYPE:
+            raise EvidenceReadError("artifact is not a registered scene bundle")
+        payload = self.open_payload(manifest_sha256, limit=64 * 1024 * 1024).read()
+        value = _strict_json_object(payload, "scene bundle")
+        try:
+            bundle = SceneBundle.model_validate(value)
+        except ValueError as error:
+            raise EvidenceReadError(f"scene bundle schema is invalid: {error}") from error
+        if bundle.decision_manifest_sha256 not in artifact.parents:
+            raise EvidenceReadError("scene bundle decision is not an immutable parent")
+        decision = self.decision(bundle.decision_manifest_sha256)
+        for frame in bundle.frames:
+            for camera in frame.cameras:
+                if camera.artifact_manifest_sha256 is None:
+                    continue
+                if camera.artifact_manifest_sha256 not in artifact.parents:
+                    raise EvidenceReadError("scene camera artifact is not an immutable parent")
+                image_artifact = self.artifact(camera.artifact_manifest_sha256)
+                if image_artifact.media_type not in _IMAGE_MEDIA_TYPES:
+                    raise EvidenceReadError("scene camera references an unsupported image artifact")
+        return bundle, decision
 
     @staticmethod
     def image_media_types() -> frozenset[str]:

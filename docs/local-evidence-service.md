@@ -21,6 +21,9 @@ uv run --locked junctionlens serve \
   --artifact-root artifacts/demo
 ```
 
+The default service validates and serves the production client from `web/dist`.
+Run `pnpm run build:web` before starting it.
+Pass `--api-only` only when a browser client is intentionally unnecessary.
 The V1 service binds only to `127.0.0.1`.
 Any other `--host` value is rejected before a socket is opened.
 Use `--open-browser` to open the local product after startup.
@@ -42,6 +45,8 @@ Every returned artifact is cross-checked against its immutable manifest and cont
 | `GET /api/v1/decisions` | List persisted release-decision artifacts. |
 | `GET /api/v1/decisions/{manifest}` | Return the exact persisted decision body after identity verification. |
 | `GET /api/v1/images/{manifest}` | Proxy one bounded registered PNG, JPEG, or WebP artifact. |
+| `GET /api/v1/scenes` | List registered immutable scene bundles. |
+| `GET /api/v1/scenes/{manifest}` | Return one strict scene bundle with its verified persisted decision. |
 
 All mutation methods return a stable read-only error.
 Unknown routes, missing artifacts, invalid parameters, unsafe registry state, and unsupported image types use the versioned `junctionlens.api-error.v1` envelope.
