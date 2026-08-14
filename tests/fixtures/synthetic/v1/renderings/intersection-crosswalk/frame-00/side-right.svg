@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="384" viewBox="0 0 640 384" data-scene="intersection-crosswalk" data-camera="side-right">
+  <rect width="640" height="384" fill="#101820" />
+  <polyline data-id="lane-5653338675810173941-right_boundary" points="-621.812,474.544 -1375.261,474.544 -2128.711,474.544 -2882.160,474.544 -3635.610,474.544 -4389.060,474.544 -5142.509,474.544 -5895.959,474.544 -6649.408,474.544 -7402.858,474.544 -8156.307,474.544" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+  <polyline data-id="lane-14590647056721135240-centerline" points="61.091,207.535 -6.546,211.593 -122.017,218.521 -363.828,233.030 -1189.761,282.586" fill="none" stroke="#45d483" stroke-width="2.5" />
+  <polyline data-id="lane-14590647056721135240-left_boundary" points="79.214,207.535 16.312,211.593 -91.076,218.521 -315.960,233.030 -1084.077,282.586" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+  <polyline data-id="lane-14590647056721135240-right_boundary" points="42.967,207.535 -29.404,211.593 -152.958,218.521 -411.696,233.030 -1295.444,282.586" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+  <polyline data-id="lane-18388703259242529286-right_boundary" points="-2032.137,479.791 -3410.284,587.408 -6434.746,823.583 -18430.920,1760.341" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+  <polyline data-id="area-13637925496478982412" points="-489.521,248.478 -583.651,248.478 -489.521,248.478" fill="none" stroke="#ffd166" stroke-width="3.0" />
+</svg>

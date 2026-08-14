@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="384" viewBox="0 0 640 384" data-scene="intersection-crosswalk" data-camera="side-left">
+  <rect width="640" height="384" fill="#101820" />
+  <polyline data-id="lane-5653338675810173941-left_boundary" points="1886.866,662.060 3140.358,662.060 4393.850,662.060 5647.343,662.060 6900.835,662.060 8154.328,662.060 9407.820,662.060 10661.312,662.060 11914.805,662.060 13168.297,662.060 14421.790,662.060" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+  <polyline data-id="lane-14590647056721135240-centerline" points="2051.172,295.870 1045.877,235.553 779.212,219.553 655.836,212.150 584.715,207.883" fill="none" stroke="#45d483" stroke-width="2.5" />
+  <polyline data-id="lane-14590647056721135240-left_boundary" points="1929.990,295.870 995.066,235.553 747.067,219.553 632.328,212.150 566.185,207.883" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+  <polyline data-id="lane-14590647056721135240-right_boundary" points="2172.354,295.870 1096.689,235.553 811.357,219.553 679.345,212.150 603.245,207.883" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+  <polyline data-id="lane-18388703259242529286-centerline" points="169969.570,13198.172 14308.655,1169.905 3002.564,371.205 1647.950,278.266 1218.553,248.806 1007.779,234.345 882.543,225.753" fill="none" stroke="#45d483" stroke-width="2.5" />
+  <polyline data-id="lane-18388703259242529286-left_boundary" points="4114.231,676.766 3340.675,524.385 2937.128,444.891 2689.352,396.083 2521.747,363.066 2574.968,356.288 2008.448,313.192 1376.156,265.891 1073.011,243.163 912.484,231.128 813.097,223.677" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+  <polyline data-id="lane-18388703259242529286-right_boundary" points="5822.399,535.763 2029.100,295.621 1400.177,255.847 1120.145,238.138 961.727,228.119" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+  <polyline data-id="area-13637925496478982412" points="1301.953,253.372 1199.666,253.372" fill="none" stroke="#ffd166" stroke-width="3.0" />
+</svg>

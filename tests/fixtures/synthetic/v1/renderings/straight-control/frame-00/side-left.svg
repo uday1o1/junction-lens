@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="384" viewBox="0 0 640 384" data-scene="straight-control" data-camera="side-left">
+  <rect width="640" height="384" fill="#101820" />
+  <polyline data-id="lane-10040925821347643860-left_boundary" points="1820.894,642.268 2721.430,642.268 3621.967,642.268 4522.503,642.268 5423.040,642.268 6323.576,642.268 7224.112,642.268 8124.649,642.268 9025.185,642.268 9925.722,642.268 10826.258,642.268" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+</svg>

@@ -11,6 +11,7 @@ import typer
 from junctionlens.cli.contract import contract_app
 from junctionlens.cli.data import data_app
 from junctionlens.cli.model import model_app
+from junctionlens.cli.synthetic import synthetic_app
 from junctionlens.doctor.service import run_doctor
 from junctionlens.evaluator import EvaluationError, evaluate_official
 
@@ -22,6 +23,7 @@ app = typer.Typer(
 app.add_typer(data_app, name="data")
 app.add_typer(contract_app, name="contract")
 app.add_typer(model_app, name="model")
+app.add_typer(synthetic_app, name="synthetic")
 
 
 @app.callback()

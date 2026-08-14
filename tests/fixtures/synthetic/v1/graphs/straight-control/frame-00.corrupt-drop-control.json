@@ -1,0 +1,1077 @@
+{
+  "graph": {
+    "edges": [],
+    "frame_key": {
+      "calibration_sha256": "3f0b0aad1bcaae9cee4da8ca5863ffbffa8f8098887c31398179087eb4b42d1a",
+      "dataset_id": "junctionlens-synthetic",
+      "dataset_version": "v1",
+      "frame_manifest_sha256": "605a33e8f7b133b7a7acf273c0055f2f5c531c9ac475bfe095c249b8d95fce8d",
+      "segment_id": "straight-control",
+      "source_domain": "SOURCE_DOMAIN_SYNTHETIC",
+      "split_id": "fixture",
+      "timestamp_ns": "1725000000000000000"
+    },
+    "lanes": [
+      {
+        "centerline": {
+          "confidence": 1.0,
+          "point_uncertainty": [
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            }
+          ],
+          "points": [
+            {
+              "x": 5.0,
+              "y": -0.1837304241335323,
+              "z": 0.0
+            },
+            {
+              "x": 8.0,
+              "y": -0.1837304241335323,
+              "z": 0.0
+            },
+            {
+              "x": 11.0,
+              "y": -0.1837304241335323,
+              "z": 0.0
+            },
+            {
+              "x": 14.0,
+              "y": -0.1837304241335323,
+              "z": 0.0
+            },
+            {
+              "x": 17.0,
+              "y": -0.1837304241335323,
+              "z": 0.0
+            },
+            {
+              "x": 20.0,
+              "y": -0.1837304241335323,
+              "z": 0.0
+            },
+            {
+              "x": 23.0,
+              "y": -0.1837304241335323,
+              "z": 0.0
+            },
+            {
+              "x": 26.0,
+              "y": -0.1837304241335323,
+              "z": 0.0
+            },
+            {
+              "x": 29.0,
+              "y": -0.1837304241335323,
+              "z": 0.0
+            },
+            {
+              "x": 32.0,
+              "y": -0.1837304241335323,
+              "z": 0.0
+            },
+            {
+              "x": 35.0,
+              "y": -0.1837304241335323,
+              "z": 0.0
+            }
+          ]
+        },
+        "centerline_laplace_scale_m": [
+          {
+            "x": 0.05,
+            "y": 0.05,
+            "z": 0.05
+          },
+          {
+            "x": 0.05,
+            "y": 0.05,
+            "z": 0.05
+          },
+          {
+            "x": 0.05,
+            "y": 0.05,
+            "z": 0.05
+          },
+          {
+            "x": 0.05,
+            "y": 0.05,
+            "z": 0.05
+          },
+          {
+            "x": 0.05,
+            "y": 0.05,
+            "z": 0.05
+          },
+          {
+            "x": 0.05,
+            "y": 0.05,
+            "z": 0.05
+          },
+          {
+            "x": 0.05,
+            "y": 0.05,
+            "z": 0.05
+          },
+          {
+            "x": 0.05,
+            "y": 0.05,
+            "z": 0.05
+          },
+          {
+            "x": 0.05,
+            "y": 0.05,
+            "z": 0.05
+          },
+          {
+            "x": 0.05,
+            "y": 0.05,
+            "z": 0.05
+          },
+          {
+            "x": 0.05,
+            "y": 0.05,
+            "z": 0.05
+          }
+        ],
+        "decoder_query_index": 0,
+        "existence_confidence": 1.0,
+        "intersection_or_connector_probability": 0.0,
+        "left_boundary": {
+          "confidence": 1.0,
+          "point_uncertainty": [
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            }
+          ],
+          "points": [
+            {
+              "x": 5.0,
+              "y": 1.5662695758664678,
+              "z": 0.0
+            },
+            {
+              "x": 8.0,
+              "y": 1.5662695758664678,
+              "z": 0.0
+            },
+            {
+              "x": 11.0,
+              "y": 1.5662695758664678,
+              "z": 0.0
+            },
+            {
+              "x": 14.0,
+              "y": 1.5662695758664678,
+              "z": 0.0
+            },
+            {
+              "x": 17.0,
+              "y": 1.5662695758664678,
+              "z": 0.0
+            },
+            {
+              "x": 20.0,
+              "y": 1.5662695758664678,
+              "z": 0.0
+            },
+            {
+              "x": 23.0,
+              "y": 1.5662695758664678,
+              "z": 0.0
+            },
+            {
+              "x": 26.0,
+              "y": 1.5662695758664678,
+              "z": 0.0
+            },
+            {
+              "x": 29.0,
+              "y": 1.5662695758664678,
+              "z": 0.0
+            },
+            {
+              "x": 32.0,
+              "y": 1.5662695758664678,
+              "z": 0.0
+            },
+            {
+              "x": 35.0,
+              "y": 1.5662695758664678,
+              "z": 0.0
+            }
+          ]
+        },
+        "left_boundary_type": {
+          "probabilities": [
+            1.0,
+            0.0
+          ]
+        },
+        "node_id": "72057594037927937",
+        "right_boundary": {
+          "confidence": 1.0,
+          "point_uncertainty": [
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            },
+            {
+              "x": 0.05,
+              "y": 0.05,
+              "z": 0.05
+            }
+          ],
+          "points": [
+            {
+              "x": 5.0,
+              "y": -1.9337304241335322,
+              "z": 0.0
+            },
+            {
+              "x": 8.0,
+              "y": -1.9337304241335322,
+              "z": 0.0
+            },
+            {
+              "x": 11.0,
+              "y": -1.9337304241335322,
+              "z": 0.0
+            },
+            {
+              "x": 14.0,
+              "y": -1.9337304241335322,
+              "z": 0.0
+            },
+            {
+              "x": 17.0,
+              "y": -1.9337304241335322,
+              "z": 0.0
+            },
+            {
+              "x": 20.0,
+              "y": -1.9337304241335322,
+              "z": 0.0
+            },
+            {
+              "x": 23.0,
+              "y": -1.9337304241335322,
+              "z": 0.0
+            },
+            {
+              "x": 26.0,
+              "y": -1.9337304241335322,
+              "z": 0.0
+            },
+            {
+              "x": 29.0,
+              "y": -1.9337304241335322,
+              "z": 0.0
+            },
+            {
+              "x": 32.0,
+              "y": -1.9337304241335322,
+              "z": 0.0
+            },
+            {
+              "x": 35.0,
+              "y": -1.9337304241335322,
+              "z": 0.0
+            }
+          ]
+        },
+        "right_boundary_type": {
+          "probabilities": [
+            1.0,
+            0.0
+          ]
+        },
+        "track_id": "17323087573866900070"
+      }
+    ],
+    "raw_tensor_artifacts": [],
+    "road_areas": [],
+    "role": "GRAPH_ROLE_PREDICTION",
+    "sensor_frame": {
+      "adapter_version": "junctionlens-synthetic-v1",
+      "cameras": [
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 384,
+            "resized_width": 640
+          },
+          "intrinsic": {
+            "values": [
+              200.0,
+              0.0,
+              320.0,
+              0.0,
+              200.0,
+              192.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 384,
+          "original_image": {
+            "byte_size": "1247",
+            "kind": "ARTIFACT_KIND_SOURCE_IMAGE",
+            "license_id": "LicenseRef-JunctionLens-Synthetic",
+            "media_type": "image/svg+xml",
+            "relative_uri": "renderings/straight-control/frame-00/front-center.svg",
+            "sha256": "e22affccba6df1b2cb188c3a598df391413942d58d0891f6b65953c44cf2f3cd"
+          },
+          "original_width": 640,
+          "slot": "CAMERA_SLOT_FRONT_CENTER",
+          "t_vehicle_camera": {
+            "values": [
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.5,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": true
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 384,
+            "resized_width": 640
+          },
+          "intrinsic": {
+            "values": [
+              200.0,
+              0.0,
+              320.0,
+              0.0,
+              200.0,
+              192.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 384,
+          "original_image": {
+            "byte_size": "1094",
+            "kind": "ARTIFACT_KIND_SOURCE_IMAGE",
+            "license_id": "LicenseRef-JunctionLens-Synthetic",
+            "media_type": "image/svg+xml",
+            "relative_uri": "renderings/straight-control/frame-00/front-left.svg",
+            "sha256": "62bafc862f7d4b8efead1459b29120e629af0ff336e844a326fd5ea468ace99c"
+          },
+          "original_width": 640,
+          "slot": "CAMERA_SLOT_FRONT_LEFT",
+          "t_vehicle_camera": {
+            "values": [
+              0.7071067811865475,
+              0.0,
+              0.7071067811865476,
+              0.0,
+              -0.7071067811865476,
+              0.0,
+              0.7071067811865475,
+              0.8,
+              0.0,
+              -1.0,
+              0.0,
+              1.5,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": true
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 384,
+            "resized_width": 640
+          },
+          "intrinsic": {
+            "values": [
+              200.0,
+              0.0,
+              320.0,
+              0.0,
+              200.0,
+              192.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 384,
+          "original_image": {
+            "byte_size": "1083",
+            "kind": "ARTIFACT_KIND_SOURCE_IMAGE",
+            "license_id": "LicenseRef-JunctionLens-Synthetic",
+            "media_type": "image/svg+xml",
+            "relative_uri": "renderings/straight-control/frame-00/front-right.svg",
+            "sha256": "d8ec6081ea17712d12c01b83cb87fd81bace784b30353247accf7a65c350dda8"
+          },
+          "original_width": 640,
+          "slot": "CAMERA_SLOT_FRONT_RIGHT",
+          "t_vehicle_camera": {
+            "values": [
+              -0.7071067811865475,
+              0.0,
+              0.7071067811865476,
+              0.0,
+              -0.7071067811865476,
+              0.0,
+              -0.7071067811865475,
+              -0.8,
+              0.0,
+              -1.0,
+              0.0,
+              1.5,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": true
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 384,
+            "resized_width": 640
+          },
+          "intrinsic": {
+            "values": [
+              200.0,
+              0.0,
+              320.0,
+              0.0,
+              200.0,
+              192.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 384,
+          "original_image": {
+            "byte_size": "510",
+            "kind": "ARTIFACT_KIND_SOURCE_IMAGE",
+            "license_id": "LicenseRef-JunctionLens-Synthetic",
+            "media_type": "image/svg+xml",
+            "relative_uri": "renderings/straight-control/frame-00/side-left.svg",
+            "sha256": "1e69cdb6e6f4a7956e4913f146b04d850079c3207533d42d89b53307fd3201fe"
+          },
+          "original_width": 640,
+          "slot": "CAMERA_SLOT_SIDE_LEFT",
+          "t_vehicle_camera": {
+            "values": [
+              1.0,
+              0.0,
+              6.123233995736766e-17,
+              0.0,
+              -6.123233995736766e-17,
+              0.0,
+              1.0,
+              0.9,
+              0.0,
+              -1.0,
+              0.0,
+              1.5,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": true
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 384,
+            "resized_width": 640
+          },
+          "intrinsic": {
+            "values": [
+              200.0,
+              0.0,
+              320.0,
+              0.0,
+              200.0,
+              192.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 384,
+          "original_image": {
+            "byte_size": "521",
+            "kind": "ARTIFACT_KIND_SOURCE_IMAGE",
+            "license_id": "LicenseRef-JunctionLens-Synthetic",
+            "media_type": "image/svg+xml",
+            "relative_uri": "renderings/straight-control/frame-00/side-right.svg",
+            "sha256": "d7e3b8168cf019fc970b7612db6b8c2cff61a3d586445c210ce5c57d532b404d"
+          },
+          "original_width": 640,
+          "slot": "CAMERA_SLOT_SIDE_RIGHT",
+          "t_vehicle_camera": {
+            "values": [
+              -1.0,
+              0.0,
+              6.123233995736766e-17,
+              0.0,
+              -6.123233995736766e-17,
+              0.0,
+              -1.0,
+              -0.9,
+              0.0,
+              -1.0,
+              0.0,
+              1.5,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": true
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 384,
+            "resized_width": 640
+          },
+          "intrinsic": {
+            "values": [
+              200.0,
+              0.0,
+              320.0,
+              0.0,
+              200.0,
+              192.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 384,
+          "original_image": {
+            "byte_size": "200",
+            "kind": "ARTIFACT_KIND_SOURCE_IMAGE",
+            "license_id": "LicenseRef-JunctionLens-Synthetic",
+            "media_type": "image/svg+xml",
+            "relative_uri": "renderings/straight-control/frame-00/rear-left.svg",
+            "sha256": "444c2842d70bd5fb2d110f013ae94793433b9ead58cab6d66b52787e543d4b15"
+          },
+          "original_width": 640,
+          "slot": "CAMERA_SLOT_REAR_LEFT",
+          "t_vehicle_camera": {
+            "values": [
+              0.7071067811865476,
+              0.0,
+              -0.7071067811865475,
+              -1.0,
+              0.7071067811865475,
+              0.0,
+              0.7071067811865476,
+              0.8,
+              0.0,
+              -1.0,
+              0.0,
+              1.5,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": true
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 384,
+            "resized_width": 640
+          },
+          "intrinsic": {
+            "values": [
+              200.0,
+              0.0,
+              320.0,
+              0.0,
+              200.0,
+              192.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 384,
+          "original_image": {
+            "byte_size": "202",
+            "kind": "ARTIFACT_KIND_SOURCE_IMAGE",
+            "license_id": "LicenseRef-JunctionLens-Synthetic",
+            "media_type": "image/svg+xml",
+            "relative_uri": "renderings/straight-control/frame-00/rear-center.svg",
+            "sha256": "1de7c1e4b3f2a0d830c97e9bf0428249595656fd2a965f2de99f854013abff3d"
+          },
+          "original_width": 640,
+          "slot": "CAMERA_SLOT_REAR_CENTER",
+          "t_vehicle_camera": {
+            "values": [
+              1.2246467991473532e-16,
+              0.0,
+              -1.0,
+              -1.0,
+              1.0,
+              0.0,
+              1.2246467991473532e-16,
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.5,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": true
+        },
+        {
+          "capture_timestamp_ns": "1725000000000000000",
+          "distortion_coefficients": [],
+          "distortion_model": "DISTORTION_MODEL_NONE",
+          "image_transform": {
+            "crop_left": 0,
+            "crop_top": 0,
+            "original_to_model": {
+              "values": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "pad_left": 0,
+            "pad_top": 0,
+            "resized_height": 384,
+            "resized_width": 640
+          },
+          "intrinsic": {
+            "values": [
+              200.0,
+              0.0,
+              320.0,
+              0.0,
+              200.0,
+              192.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "original_height": 384,
+          "original_image": {
+            "byte_size": "201",
+            "kind": "ARTIFACT_KIND_SOURCE_IMAGE",
+            "license_id": "LicenseRef-JunctionLens-Synthetic",
+            "media_type": "image/svg+xml",
+            "relative_uri": "renderings/straight-control/frame-00/rear-right.svg",
+            "sha256": "8c803dd3e5350d2e230e545f25079cc57aaae96b4340333b2a748890e528452e"
+          },
+          "original_width": 640,
+          "slot": "CAMERA_SLOT_REAR_RIGHT",
+          "t_vehicle_camera": {
+            "values": [
+              -0.7071067811865476,
+              0.0,
+              -0.7071067811865475,
+              -1.0,
+              0.7071067811865475,
+              0.0,
+              -0.7071067811865476,
+              -0.8,
+              0.0,
+              -1.0,
+              0.0,
+              1.5,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "valid": true
+        }
+      ],
+      "frame_key": {
+        "calibration_sha256": "3f0b0aad1bcaae9cee4da8ca5863ffbffa8f8098887c31398179087eb4b42d1a",
+        "dataset_id": "junctionlens-synthetic",
+        "dataset_version": "v1",
+        "frame_manifest_sha256": "605a33e8f7b133b7a7acf273c0055f2f5c531c9ac475bfe095c249b8d95fce8d",
+        "segment_id": "straight-control",
+        "source_domain": "SOURCE_DOMAIN_SYNTHETIC",
+        "split_id": "fixture",
+        "timestamp_ns": "1725000000000000000"
+      },
+      "pose_valid": true,
+      "t_world_vehicle": {
+        "values": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "tracks": [
+      {
+        "age_observed_frames": 1,
+        "current_node_id": "72057594037927937",
+        "first_timestamp_ns": "1725000000000000000",
+        "last_timestamp_ns": "1725000000000000000",
+        "missed_frame_count": 0,
+        "node_type": "NODE_TYPE_LANE_SEGMENT",
+        "termination_reason": "TRACK_TERMINATION_REASON_ACTIVE",
+        "track_id": "17323087573866900070"
+      }
+    ],
+    "traffic_controls": [],
+    "warnings": []
+  },
+  "producer": {
+    "configuration_sha256": "1b32a05e83b0514803fdef9ad454d1ea5e2b4e42f837f8e82f7f377e7b70fab2",
+    "execution_provider_profile": "synthetic-perfect-prediction",
+    "git_commit": "0000000000000000000000000000000000000000",
+    "git_dirty": false,
+    "model_artifact_sha256": "99fd9dd3dad3b051760c5f7b0a1de8d3a492a1b0ccd0ad4ce3852145fa3a823b",
+    "provider_assignment_digest": "3133fd48a739001db9c0fe6907d44b7d90ec4b4289d9bda19ddb83fb2de2cdcf",
+    "random_seed": "20260813",
+    "runtime_build_sha256": "97618d91e79cd221be3db2592f5811d56ffe99852b12759691a0003c6356708d"
+  },
+  "schema_major": 1,
+  "schema_minor": 0
+}

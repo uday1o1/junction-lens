@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="384" viewBox="0 0 640 384" data-scene="straight-control" data-camera="front-center">
+  <rect width="640" height="384" fill="#101820" />
+  <polyline data-id="lane-10040925821347643860-centerline" points="327.349,252.000 324.593,229.500 323.341,219.273 322.625,213.429 322.162,209.647 321.837,207.000 321.598,205.043 321.413,203.538 321.267,202.345 321.148,201.375 321.050,200.571" fill="none" stroke="#45d483" stroke-width="2.5" />
+  <polyline data-id="lane-10040925821347643860-left_boundary" points="257.349,252.000 280.843,229.500 291.522,219.273 297.625,213.429 301.573,209.647 304.337,207.000 306.380,205.043 307.952,203.538 309.198,202.345 310.211,201.375 311.050,200.571" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+  <polyline data-id="lane-10040925821347643860-right_boundary" points="397.349,252.000 368.343,229.500 355.159,219.273 347.625,213.429 342.750,209.647 339.337,207.000 336.815,205.043 334.875,203.538 333.336,202.345 332.086,201.375 331.050,200.571" fill="none" stroke="#8bd6ff" stroke-width="1.5" />
+  <rect data-id="control-15435265659003726530" x="288.000" y="57.600" width="64.000" height="57.600" fill="none" stroke="#ff5c5c" stroke-width="2.0" />
+</svg>

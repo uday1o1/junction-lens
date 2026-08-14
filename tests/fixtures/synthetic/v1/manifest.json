@@ -1,0 +1,653 @@
+{
+  "configuration_sha256": "1b32a05e83b0514803fdef9ad454d1ea5e2b4e42f837f8e82f7f377e7b70fab2",
+  "content_file_count": 66,
+  "corruptions": [
+    "drop-control",
+    "break-topology",
+    "shift-lane"
+  ],
+  "file_count": 67,
+  "files": [
+    {
+      "byte_size": 51337,
+      "frame_index": 0,
+      "media_type": "application/json",
+      "path": "graphs/intersection-crosswalk/frame-00.corrupt-shift-lane.json",
+      "scene": "intersection-crosswalk",
+      "sha256": "886682b86b166c857001fb73bc89ef1bb48614ef08438c157e7ccee403f0d6f7",
+      "variant": "corrupt-shift-lane"
+    },
+    {
+      "byte_size": 12150,
+      "frame_index": 0,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/intersection-crosswalk/frame-00.corrupt-shift-lane.pb",
+      "scene": "intersection-crosswalk",
+      "sha256": "562e1203fe143a1f816bb85d2b337dece8c529444b25d596caf74d3ca2bb1c85",
+      "variant": "corrupt-shift-lane"
+    },
+    {
+      "byte_size": 52137,
+      "frame_index": 0,
+      "media_type": "application/json",
+      "path": "graphs/intersection-crosswalk/frame-00.ground-truth.json",
+      "scene": "intersection-crosswalk",
+      "sha256": "4b23401302d2afb89d1e7bfc9470eb206b0eb3f5cb7199b01f5af59f827fec89",
+      "variant": "ground-truth"
+    },
+    {
+      "byte_size": 12361,
+      "frame_index": 0,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/intersection-crosswalk/frame-00.ground-truth.pb",
+      "scene": "intersection-crosswalk",
+      "sha256": "21eac456c465fe5faf98536c969f80ce4f28e81e9041be2df2186faec7da80d3",
+      "variant": "ground-truth"
+    },
+    {
+      "byte_size": 51392,
+      "frame_index": 0,
+      "media_type": "application/json",
+      "path": "graphs/intersection-crosswalk/frame-00.perfect.json",
+      "scene": "intersection-crosswalk",
+      "sha256": "d26ef75b8c3cd982b7e6704d35238d40e4a03fe5b676854a37f69490564a4ac1",
+      "variant": "perfect"
+    },
+    {
+      "byte_size": 12150,
+      "frame_index": 0,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/intersection-crosswalk/frame-00.perfect.pb",
+      "scene": "intersection-crosswalk",
+      "sha256": "39a0482ab5aae94d430052b62f7b47bac6cba05473dc8efac5abd4d791a8ea95",
+      "variant": "perfect"
+    },
+    {
+      "byte_size": 47183,
+      "frame_index": 0,
+      "media_type": "application/json",
+      "path": "graphs/merge/frame-00.corrupt-break-topology.json",
+      "scene": "merge",
+      "sha256": "520dc63ee50a44f713016262af7b557f423e2884189a64e60d2e5fe463a4dc4e",
+      "variant": "corrupt-break-topology"
+    },
+    {
+      "byte_size": 11138,
+      "frame_index": 0,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/merge/frame-00.corrupt-break-topology.pb",
+      "scene": "merge",
+      "sha256": "18e7d2a788afe80209fae9bbe81f1b67b097d913d193bcd11a48d6c37deb4acc",
+      "variant": "corrupt-break-topology"
+    },
+    {
+      "byte_size": 47962,
+      "frame_index": 0,
+      "media_type": "application/json",
+      "path": "graphs/merge/frame-00.ground-truth.json",
+      "scene": "merge",
+      "sha256": "342f4e729d59b35260bf9cff6eb2880b3f2e42b9e0eff4490bc3745008c2e5f0",
+      "variant": "ground-truth"
+    },
+    {
+      "byte_size": 11241,
+      "frame_index": 0,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/merge/frame-00.ground-truth.pb",
+      "scene": "merge",
+      "sha256": "d9edb4a8013047e817290ad5a77ea4b154bce6f0f8e01f412271f86496019b91",
+      "variant": "ground-truth"
+    },
+    {
+      "byte_size": 47605,
+      "frame_index": 0,
+      "media_type": "application/json",
+      "path": "graphs/merge/frame-00.perfect.json",
+      "scene": "merge",
+      "sha256": "c65b238191d149fb44c14491f0f6e955bc4c4e0719f652e967181e70357376c9",
+      "variant": "perfect"
+    },
+    {
+      "byte_size": 11211,
+      "frame_index": 0,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/merge/frame-00.perfect.pb",
+      "scene": "merge",
+      "sha256": "27df119925733ef2fcffeabd6682b4dc9b7ed27ace3157dd511180f00f184bb5",
+      "variant": "perfect"
+    },
+    {
+      "byte_size": 47930,
+      "frame_index": 0,
+      "media_type": "application/json",
+      "path": "graphs/split/frame-00.ground-truth.json",
+      "scene": "split",
+      "sha256": "2ad0330ea1a55a6b29e0b8126720aca809aa04d621aaaad3c63b1c7838619df3",
+      "variant": "ground-truth"
+    },
+    {
+      "byte_size": 11242,
+      "frame_index": 0,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/split/frame-00.ground-truth.pb",
+      "scene": "split",
+      "sha256": "836655954e63f94071efeaa28ad52459582de36590486046d00e16f4de6d0d32",
+      "variant": "ground-truth"
+    },
+    {
+      "byte_size": 47571,
+      "frame_index": 0,
+      "media_type": "application/json",
+      "path": "graphs/split/frame-00.perfect.json",
+      "scene": "split",
+      "sha256": "2e5746bc796c1048b037717f8c83afe4e4890af23d76c305ecbe968e8022c2e8",
+      "variant": "perfect"
+    },
+    {
+      "byte_size": 11210,
+      "frame_index": 0,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/split/frame-00.perfect.pb",
+      "scene": "split",
+      "sha256": "71ae3127f35aee41bbf3275af88de97b19d70e2427d60c4cc02936ab67a5981f",
+      "variant": "perfect"
+    },
+    {
+      "byte_size": 27039,
+      "frame_index": 0,
+      "media_type": "application/json",
+      "path": "graphs/straight-control/frame-00.corrupt-drop-control.json",
+      "scene": "straight-control",
+      "sha256": "9a4218b0554569864e045893106c5b0f94b69a7fc9b1491e5a52d7593cd9bee1",
+      "variant": "corrupt-drop-control"
+    },
+    {
+      "byte_size": 6985,
+      "frame_index": 0,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/straight-control/frame-00.corrupt-drop-control.pb",
+      "scene": "straight-control",
+      "sha256": "26f664a4aadabbe0b66c0fa2960bde3c71dd68bee9381b75f7506484bf6f3242",
+      "variant": "corrupt-drop-control"
+    },
+    {
+      "byte_size": 29133,
+      "frame_index": 0,
+      "media_type": "application/json",
+      "path": "graphs/straight-control/frame-00.ground-truth.json",
+      "scene": "straight-control",
+      "sha256": "9606229342fdac625839afc4efdbbee2ff044cc9c41904a1c1f15516727b02b7",
+      "variant": "ground-truth"
+    },
+    {
+      "byte_size": 7319,
+      "frame_index": 0,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/straight-control/frame-00.ground-truth.pb",
+      "scene": "straight-control",
+      "sha256": "2a61a709eff3cb67a6367705e7689073bf2b3936824b8482ef540f49f1115071",
+      "variant": "ground-truth"
+    },
+    {
+      "byte_size": 28895,
+      "frame_index": 0,
+      "media_type": "application/json",
+      "path": "graphs/straight-control/frame-00.perfect.json",
+      "scene": "straight-control",
+      "sha256": "93b2d43f120ba431e6f737a403c4a74d2b55781b43f88c104bf1420f2cfd5736",
+      "variant": "perfect"
+    },
+    {
+      "byte_size": 7298,
+      "frame_index": 0,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/straight-control/frame-00.perfect.pb",
+      "scene": "straight-control",
+      "sha256": "747f522ff2d9f99d14d8c81a44775594d28549726bb18a8e297b12095a3edea8",
+      "variant": "perfect"
+    },
+    {
+      "byte_size": 29130,
+      "frame_index": 1,
+      "media_type": "application/json",
+      "path": "graphs/straight-control/frame-01.ground-truth.json",
+      "scene": "straight-control",
+      "sha256": "2dbf24d9b113751a27720fdc8110f7a9baed4c180aaa8a519fcf235beb671234",
+      "variant": "ground-truth"
+    },
+    {
+      "byte_size": 7319,
+      "frame_index": 1,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/straight-control/frame-01.ground-truth.pb",
+      "scene": "straight-control",
+      "sha256": "f831b69dec561ba93b90f05766094c4a743a437fc465e27919a17730906dffa5",
+      "variant": "ground-truth"
+    },
+    {
+      "byte_size": 28893,
+      "frame_index": 1,
+      "media_type": "application/json",
+      "path": "graphs/straight-control/frame-01.perfect.json",
+      "scene": "straight-control",
+      "sha256": "3620568f81e4bae094cd9878bb86489083b9e779dd5b2e808421f4ee6295710d",
+      "variant": "perfect"
+    },
+    {
+      "byte_size": 7299,
+      "frame_index": 1,
+      "media_type": "application/x-protobuf",
+      "path": "graphs/straight-control/frame-01.perfect.pb",
+      "scene": "straight-control",
+      "sha256": "f7df329676ccc002e9f82a956e75a79d689e261f8c5857071a6d22ec82b40753",
+      "variant": "perfect"
+    },
+    {
+      "byte_size": 3221,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/intersection-crosswalk/frame-00/front-center.svg",
+      "scene": "intersection-crosswalk",
+      "sha256": "a81bda780fba4194fbfc00cd176d9abd89428947713dfbeb416aeabbd68c17d0",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 3076,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/intersection-crosswalk/frame-00/front-left.svg",
+      "scene": "intersection-crosswalk",
+      "sha256": "f565b1b21ecc09a35d429a4a7985591566f3f433eb190c665289995a1248a58c",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 3056,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/intersection-crosswalk/frame-00/front-right.svg",
+      "scene": "intersection-crosswalk",
+      "sha256": "e6d79da8172463d8b71b5de1a7c686caafade4dfb7e0d02733c6f4a4f3075fdc",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 208,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/intersection-crosswalk/frame-00/rear-center.svg",
+      "scene": "intersection-crosswalk",
+      "sha256": "51d05f24ea5300cf5ea37e0eda68a8a78ebd095b47c92d1b5ff5b897c831c481",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 206,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/intersection-crosswalk/frame-00/rear-left.svg",
+      "scene": "intersection-crosswalk",
+      "sha256": "8affe401daf7978eedf856b9389dca01877b394004d4fa1ecf7b54c0fd2b663a",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 207,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/intersection-crosswalk/frame-00/rear-right.svg",
+      "scene": "intersection-crosswalk",
+      "sha256": "c4b8ed2e169416c82bba6870f8759255e3cb0210c1cd3c0e361d183780e49103",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 2026,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/intersection-crosswalk/frame-00/side-left.svg",
+      "scene": "intersection-crosswalk",
+      "sha256": "61043eadda970ac4150c5e3d9b6bda66276f6b3e00c2bb07428b63b7fc8e537e",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 1492,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/intersection-crosswalk/frame-00/side-right.svg",
+      "scene": "intersection-crosswalk",
+      "sha256": "b694739d7fdf99188d8fb59bbbf31844c0d6d4f5e1371d5fbeb8462f2e85439a",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 2859,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/merge/frame-00/front-center.svg",
+      "scene": "merge",
+      "sha256": "5809aa84b95aa959d0ea276f425745c8029c2d00175a3aef8fa89bfd2f609146",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 2844,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/merge/frame-00/front-left.svg",
+      "scene": "merge",
+      "sha256": "92ab8bdc55f6d684b10a940929a5cd25d69fbd252d493ef010b64b386fce29e1",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 2817,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/merge/frame-00/front-right.svg",
+      "scene": "merge",
+      "sha256": "341d209402c8a0ab21405e24ecd8d600362de63c5ba306d131223efb2bfea978",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 191,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/merge/frame-00/rear-center.svg",
+      "scene": "merge",
+      "sha256": "e47965de7557da6596a5eebdfed9efff83bfca65e8afb6d9bdbac88ecabda37b",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 189,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/merge/frame-00/rear-left.svg",
+      "scene": "merge",
+      "sha256": "a56c0f91575b8ca6496c1382207c16d6363e80a6839821fd62748d90acec5c03",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 190,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/merge/frame-00/rear-right.svg",
+      "scene": "merge",
+      "sha256": "fd156ca3517c108b892f7b806e0eaf7e5a9624832e7338cc8d6a2c3f28b8865a",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 1265,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/merge/frame-00/side-left.svg",
+      "scene": "merge",
+      "sha256": "15ce63f5598b9f7ae724d4c275fe0d48a17accf96d2564f6cfa99f2b991b256e",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 1262,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/merge/frame-00/side-right.svg",
+      "scene": "merge",
+      "sha256": "b3673d489b9d2105f0a14a0941b295b3234b20411cd561204994de86f41213a5",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 2862,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/split/frame-00/front-center.svg",
+      "scene": "split",
+      "sha256": "446ce1aaa7696f4b26bef2e2b788532315414362bedd78b44e92de8f9fd262db",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 2861,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/split/frame-00/front-left.svg",
+      "scene": "split",
+      "sha256": "92e395646821ccab982ddd2f8aa66747bb1720fe941913e3c2ad152e0dc823bb",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 2816,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/split/frame-00/front-right.svg",
+      "scene": "split",
+      "sha256": "af3e68490ec6b28f421638f6c3d5293825118fdcf0dd70101260329e881e3f8c",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 191,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/split/frame-00/rear-center.svg",
+      "scene": "split",
+      "sha256": "6051ad0fab7b9ccb1813f3935e5c75ceaa550fed85cce51e2b3f0676a2065f27",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 189,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/split/frame-00/rear-left.svg",
+      "scene": "split",
+      "sha256": "2d4015c36421710a47caa8157ee7cd7daaee81c39655316b521004a7af859de8",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 190,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/split/frame-00/rear-right.svg",
+      "scene": "split",
+      "sha256": "dba64d95f6234fd824b4299a5daf342f7de32546b85b464e5631ef5f13585bfe",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 1340,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/split/frame-00/side-left.svg",
+      "scene": "split",
+      "sha256": "07bdb37b6a3ecb97841d0388b6f3665de1a47345bde3be695678bed86e4d5256",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 1407,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/split/frame-00/side-right.svg",
+      "scene": "split",
+      "sha256": "b8d7d669aaef08bbf612802f290dce807cabc8dda0707fb1ed29c311a2e3e7aa",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 1247,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-00/front-center.svg",
+      "scene": "straight-control",
+      "sha256": "e22affccba6df1b2cb188c3a598df391413942d58d0891f6b65953c44cf2f3cd",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 1094,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-00/front-left.svg",
+      "scene": "straight-control",
+      "sha256": "62bafc862f7d4b8efead1459b29120e629af0ff336e844a326fd5ea468ace99c",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 1083,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-00/front-right.svg",
+      "scene": "straight-control",
+      "sha256": "d8ec6081ea17712d12c01b83cb87fd81bace784b30353247accf7a65c350dda8",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 202,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-00/rear-center.svg",
+      "scene": "straight-control",
+      "sha256": "1de7c1e4b3f2a0d830c97e9bf0428249595656fd2a965f2de99f854013abff3d",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 200,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-00/rear-left.svg",
+      "scene": "straight-control",
+      "sha256": "444c2842d70bd5fb2d110f013ae94793433b9ead58cab6d66b52787e543d4b15",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 201,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-00/rear-right.svg",
+      "scene": "straight-control",
+      "sha256": "8c803dd3e5350d2e230e545f25079cc57aaae96b4340333b2a748890e528452e",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 510,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-00/side-left.svg",
+      "scene": "straight-control",
+      "sha256": "1e69cdb6e6f4a7956e4913f146b04d850079c3207533d42d89b53307fd3201fe",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 521,
+      "frame_index": 0,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-00/side-right.svg",
+      "scene": "straight-control",
+      "sha256": "d7e3b8168cf019fc970b7612db6b8c2cff61a3d586445c210ce5c57d532b404d",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 1247,
+      "frame_index": 1,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-01/front-center.svg",
+      "scene": "straight-control",
+      "sha256": "77030dbc1a8a0fc45fd7eaf4b8e2fdd3fa6117b0b7df6485d31f43fa1347f11b",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 1095,
+      "frame_index": 1,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-01/front-left.svg",
+      "scene": "straight-control",
+      "sha256": "258972aa912e703c42e54146ead003b88d01605f512f9b1458900dc7b88a9f8a",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 1085,
+      "frame_index": 1,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-01/front-right.svg",
+      "scene": "straight-control",
+      "sha256": "97f9a6fc8d712f3558c14c8cc80c69d2ae11847c646c25a2713902713e71fa3d",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 202,
+      "frame_index": 1,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-01/rear-center.svg",
+      "scene": "straight-control",
+      "sha256": "1de7c1e4b3f2a0d830c97e9bf0428249595656fd2a965f2de99f854013abff3d",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 200,
+      "frame_index": 1,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-01/rear-left.svg",
+      "scene": "straight-control",
+      "sha256": "444c2842d70bd5fb2d110f013ae94793433b9ead58cab6d66b52787e543d4b15",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 201,
+      "frame_index": 1,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-01/rear-right.svg",
+      "scene": "straight-control",
+      "sha256": "8c803dd3e5350d2e230e545f25079cc57aaae96b4340333b2a748890e528452e",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 510,
+      "frame_index": 1,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-01/side-left.svg",
+      "scene": "straight-control",
+      "sha256": "17909f1473286f981b48e0b00bc11083ec1700722c291ca0fef77b4b34c8a46d",
+      "variant": "source-rendering"
+    },
+    {
+      "byte_size": 520,
+      "frame_index": 1,
+      "media_type": "image/svg+xml",
+      "path": "renderings/straight-control/frame-01/side-right.svg",
+      "scene": "straight-control",
+      "sha256": "ffbb0c8db941f58e6120e64e511130c663d470a053589c768e0fa75ebba3cc04",
+      "variant": "source-rendering"
+    }
+  ],
+  "generator": "junctionlens-synthetic-generator-v1",
+  "mandatory_shapes": {
+    "control": [
+      "intersection-crosswalk",
+      "straight-control"
+    ],
+    "crosswalk": [
+      "intersection-crosswalk"
+    ],
+    "intersection": [
+      "intersection-crosswalk"
+    ],
+    "merge": [
+      "merge"
+    ],
+    "road": [
+      "intersection-crosswalk",
+      "merge",
+      "split",
+      "straight-control"
+    ],
+    "split": [
+      "split"
+    ],
+    "temporal-ego-motion": [
+      "straight-control"
+    ]
+  },
+  "schema": "junctionlens.synthetic-corpus/v1",
+  "seed": 20260813,
+  "temporal_sequences": [
+    {
+      "ego_translation_x_m": [
+        0.0,
+        2.0
+      ],
+      "frame_indices": [
+        0,
+        1
+      ],
+      "scene": "straight-control",
+      "timestamps_ns": [
+        1725000000000000000,
+        1725000000100000000
+      ]
+    }
+  ]
+}

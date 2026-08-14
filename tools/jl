@@ -27,6 +27,9 @@ Repository commands:
   test-python
   test-contract
   generate-bindings
+  generate-synthetic [--output DIR]
+  verify-synthetic [--root DIR]
+  test-integration-synthetic
   test-web
   build-evaluator [--check-lock]
   test-evaluator
@@ -41,6 +44,7 @@ Repository commands:
   verify-m0-3-local
   verify-m1-1
   verify-m1-2
+  verify-m1-3
 EOF
 }
 
@@ -108,6 +112,27 @@ case "$JL_COMMAND" in
     ;;
   generate-bindings)
     python scripts/contracts/generate_bindings.py --python "$@"
+    ;;
+  generate-synthetic)
+    if [ "$#" -eq 0 ]; then
+      uv run --locked junctionlens synthetic generate --output "$JL_ROOT/artifacts/synthetic"
+    else
+      uv run --locked junctionlens synthetic generate "$@"
+    fi
+    ;;
+  verify-synthetic)
+    if [ "$#" -eq 0 ]; then
+      uv run --locked junctionlens synthetic verify \
+        --root "$JL_ROOT/tests/fixtures/synthetic/v1"
+    else
+      uv run --locked junctionlens synthetic verify "$@"
+    fi
+    ;;
+  test-integration-synthetic)
+    uv run --locked pytest \
+      "$JL_ROOT/tests/unit/test_synthetic_generator.py" \
+      "$JL_ROOT/tests/integration/test_synthetic_cli.py" \
+      "$@"
     ;;
   test-web)
     pnpm run typecheck:web
@@ -183,6 +208,11 @@ case "$JL_COMMAND" in
     "$0" configure-sanitizers
     "$0" build-sanitizers
     "$0" test-sanitizers
+    ;;
+  verify-m1-3)
+    "$0" verify-m1-2
+    "$0" test-integration-synthetic
+    "$0" verify-synthetic
     ;;
   -h|--help|help)
     usage
