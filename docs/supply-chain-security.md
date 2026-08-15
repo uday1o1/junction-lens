@@ -61,8 +61,7 @@ The loopback API uses a restrictive content security policy, frame denial, no-sn
 Artifact reads originate from verified registry identities and no endpoint accepts an arbitrary path.
 The service disables access logs, returns generic internal errors, and redacts local roots, URL credentials, authorization values, signed URL queries, and secret-like assignments from configuration diagnostics.
 
-## CI contract
+## Local verification contract
 
-The security workflow pins every third-party action to an immutable commit.
-It synchronizes exact Python and Node dependency locks, runs parser and seeded-control tests, inventories licenses, scans secrets, queries both advisory services, and generates the deterministic SBOM.
-The workflow does not upload generated evidence or restricted artifacts.
+The repository-owned security commands synchronize exact Python and Node dependency locks, run parser and seeded-control tests, inventory licenses, scan secrets, query both advisory services, and generate the deterministic SBOM.
+The commands do not upload generated evidence or restricted artifacts.

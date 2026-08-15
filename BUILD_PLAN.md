@@ -1,6 +1,6 @@
 # JunctionLens Build Plan
 
-Status: implementation in progress with the complete local core verified and the consolidated licensed-data and GPU qualification blocked on external prerequisites.
+Status: implementation is paused at a safe boundary with the complete local core verified and the consolidated licensed-data and GPU qualification blocked on external prerequisites.
 
 ## Implementation stop status on 2026-08-14
 
@@ -336,7 +336,7 @@ A checksum mismatch is a hard failure and must never be treated as a warning.
 The repository must support three profiles:
 
 `synthetic` uses only repository-owned generated geometry, controls, calibration, and prediction fixtures.
-It is mandatory for CI and the unrestricted public demo.
+It is mandatory for local verification and the unrestricted public demo.
 
 `sample` uses the approximately 300 MB official OpenLane-V2 sample after license acknowledgment.
 It is used for adapter, visualization, evaluator, micro-overfit, and interface validation.
@@ -344,7 +344,7 @@ It is used for adapter, visualization, evaluator, micro-overfit, and interface v
 `full` uses the explicitly selected subset A archives and optional subset B diagnostic archives.
 It is used for portfolio model training and final evidence.
 
-CI must never assume that `sample` or `full` exists.
+Local verification must never assume that `sample` or `full` exists.
 
 ### 7.4 Split isolation
 
@@ -475,7 +475,7 @@ The conditional TensorRT image uses TensorRT 10.14.1.48, whose upstream-tested L
 The exact ONNX Runtime source archive hash, compiler flags, CUDA architectures, provider flags, shared-library hashes, and OCI digest are frozen in `containers/images.lock`.
 The CPU artifact is built without CUDA or TensorRT providers and has no GPU-library dependency.
 The GPU artifact is separate because the CUDA provider has hard load-time CUDA and cuDNN dependencies even when a session requests CPU execution.
-No CPU CI job may install or load the GPU artifact.
+No CPU-only local gate may install or load the GPU artifact.
 
 The official OpenLane-V2 evaluator is not installed in the CPython 3.12 application environment.
 It runs untouched in a digest-pinned Python 3.8 compatibility container with the exact v2.1 requirements, including NumPy from 1.22 through 1.23, SciPy 1.8.0, OR-Tools 9.2.9972, and Shapely 2.0.0.
@@ -500,7 +500,7 @@ Any checked-in generated file must be labeled and updated only through its gener
 The provider profiles are exact and ordered.
 
 `cpu-reference` registers only `CPUExecutionProvider` and uses FP32.
-It is mandatory on developer machines and CI for correctness and portability.
+It is mandatory on developer machines and in CPU verification for correctness and portability.
 It is not required to meet the real-time gate.
 
 `cuda` registers `CUDAExecutionProvider` followed by `CPUExecutionProvider` and uses FP16 model weights where validated.
@@ -1808,7 +1808,7 @@ Environment capture uses an allowlist.
 
 ### 24.4 Supply chain
 
-CI runs dependency vulnerability scanning, secret scanning, license inventory, and an SBOM generator.
+The local `./tools/jl test-security` gate runs dependency vulnerability scanning, secret scanning, license inventory, and an SBOM generator.
 Downloaded archives and source releases require checksums.
 OCI images require digests.
 The public release checklist blocks known critical vulnerabilities in reachable runtime dependencies unless a documented non-reachability assessment exists.
@@ -1896,7 +1896,7 @@ junction-lens/
 │   └── analysis/
 ├── scripts/
 │   ├── bootstrap/
-│   ├── ci/
+│   ├── qualification/
 │   └── gpu/
 ├── docs/
 │   ├── architecture.md
@@ -1908,7 +1908,6 @@ junction-lens/
 │   ├── model-card.md
 │   ├── safety-and-limitations.md
 │   └── interview-walkthrough.md
-└── .github/workflows/
 ```
 
 `artifacts/`, `data/`, `checkpoints/`, `engines/`, `profiles/`, and private thumbnails are ignored.
@@ -1967,7 +1966,7 @@ uv run junctionlens compare --baseline <baseline-hash> --candidate <candidate-ha
 Commands must not require activation of a manually managed virtual environment.
 They must fail with an actionable message when a licensed dataset or GPU prerequisite is absent.
 
-## 27. Test and CI strategy
+## 27. Test and local verification strategy
 
 ### 27.1 Unit and property tests
 
@@ -2039,9 +2038,9 @@ Web runs formatter, ESLint, TypeScript no-emit checking, Vitest, accessibility a
 The initial coverage floors are 85 percent branch coverage for the Python evaluation, registry, and gate packages, 80 percent line coverage for C++ evaluator and tracker code, and 80 percent statement coverage for dashboard decision rendering.
 Coverage is a floor rather than a substitute for real-path tests.
 
-### 27.5 CI jobs
+### 27.5 Local verification jobs
 
-Pull-request CI uses only public source and synthetic fixtures.
+The public-source local suite uses only synthetic fixtures.
 It includes:
 
 - Dependency-lock verification.
@@ -2057,8 +2056,8 @@ It includes:
 - CPU ONNX inference parity.
 - OCI build without GPU execution.
 
-Nightly or manually authorized private CI may use licensed sample data and a GPU runner.
-Its artifacts remain private unless redacted.
+Licensed sample data and GPU execution occur only through the explicitly invoked private target-qualification workflow.
+Those artifacts remain private unless redacted.
 
 ### 27.6 Flake policy
 

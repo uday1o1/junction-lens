@@ -8,7 +8,7 @@ Accepted for reproducible OCI image exports.
 
 The detected Docker Engine exposes only the legacy builder because its optional Buildx CLI plugin is absent.
 The legacy builder cannot export an OCI layout and embeds unstable build metadata, so it cannot satisfy the image-digest lock or clean-build reproducibility gates.
-Installing an unpinned host-global plugin would make developer and CI behavior diverge.
+Installing an unpinned host-global plugin would make developer and clean-checkout behavior diverge.
 
 ## Decision
 

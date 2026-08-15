@@ -1,7 +1,7 @@
 # JunctionLens
 
 JunctionLens is a local-first research and model-development product for control-aware road-scene graphs.
-It is under active implementation according to the acceptance gates in `BUILD_PLAN.md`.
+Implementation is paused at the safe boundary recorded in `BUILD_PLAN.md`.
 The unrestricted CPU product path is implemented through deterministic synthetic evidence.
 Licensed-data, trained-model, accelerated-runtime, and final-release claims remain blocked until their named gates pass.
 

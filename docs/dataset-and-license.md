@@ -13,7 +13,7 @@ The machine-local registration receipt stores the canonical root and content has
 Later immutable registry artifacts store only a redacted receipt hash, not personal data or a machine path.
 
 The unrestricted `synthetic` profile uses only repository-owned generated geometry, controls, calibration, and renderings.
-CI and the public demonstration use that profile.
+Local verification and the public demonstration use that profile.
 
 ## Licensed local workflow
 
