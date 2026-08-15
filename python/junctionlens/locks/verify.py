@@ -235,6 +235,29 @@ def _validate_audit_policy_lock(root: Path, dataset: Mapping[str, Any]) -> None:
 def _validate_images(payload: Mapping[str, Any]) -> None:
     if payload.get("platform") != "linux/amd64":
         raise LockVerificationError("image lock must target linux/amd64")
+    builders = payload.get("builders")
+    if not isinstance(builders, dict) or set(builders) != {"evaluator"}:
+        raise LockVerificationError("image lock must contain the evaluator builder")
+    evaluator_builder = builders["evaluator"]
+    if not isinstance(evaluator_builder, dict) or set(evaluator_builder) != {
+        "driver",
+        "image",
+        "image_index_sha256",
+        "version",
+    }:
+        raise LockVerificationError("evaluator builder lock is incomplete")
+    builder_digest = _require_hash(
+        evaluator_builder.get("image_index_sha256"),
+        _SHA256,
+        "evaluator builder image index sha256",
+    )
+    if evaluator_builder.get("image") != (f"docker.io/moby/buildkit@sha256:{builder_digest}"):
+        raise LockVerificationError("evaluator builder image is not digest-pinned")
+    if evaluator_builder.get("driver") != "docker-container":
+        raise LockVerificationError("evaluator builder must use docker-container")
+    version = evaluator_builder.get("version")
+    if not isinstance(version, str) or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) is None:
+        raise LockVerificationError("evaluator BuildKit version is not exact")
     base_images = payload.get("base_images")
     if not isinstance(base_images, dict) or set(base_images) != {
         "cpu",

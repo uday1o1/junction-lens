@@ -1,5 +1,11 @@
 schema_version: "1.0.0"
 platform: linux/amd64
+builders:
+  evaluator:
+    driver: docker-container
+    image: docker.io/moby/buildkit@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
+    image_index_sha256: 0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
+    version: 0.30.0
 base_images:
   cpu:
     reference: docker.io/library/ubuntu@sha256:019e8eb29a85e74d64925745884f2ec79aa27e3feab36353d24656f4d6b89467
@@ -43,10 +49,10 @@ application_images:
     state: PENDING_REPRODUCIBLE_BUILD
   official_evaluator:
     build_context_sha256: 287bdaff92733cc4d7ba6e9ef7be9462d3d111edc42ab2d02043c969186df95d
-    config_sha256: f8c88d0f5ecc6823d5ed60d22ed04066345bc1fd5237aca72f3990054d08d0c7
+    config_sha256: 502743806a0c85e837c42e0ffdb30e926e232093b02fad5282909c1754daea33
     local_reference: junctionlens/official-evaluator:v2.1.0
-    oci_index_sha256: f82aafd3c476eebb0f8f35bddc51b82d276ab7b1e0743857b4ef4937dc9c8d0e
-    platform_manifest_sha256: 47e8d5542614e5d59c3964c9607a91cb4247decfb37a222e8e95065386db88e2
+    oci_index_sha256: 728c12638feda9eb0e856a178ff638a5cf02600d1983ad5073aea6343b9fe820
+    platform_manifest_sha256: 82b77905f1fd2b2429aacdf9346f4d6e5d68b2007f9bf6d5570be9156bab812e
     source_date_epoch: 1698810385
     state: ACCEPTED_LOCAL
   gpu:

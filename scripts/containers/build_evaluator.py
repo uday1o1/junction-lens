@@ -4,13 +4,17 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tarfile
-from collections.abc import Mapping
+import tempfile
+import uuid
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +28,7 @@ from junctionlens.bootstrap import download_verified  # noqa: E402
 
 SOURCE_DATE_EPOCH = "1698810385"
 LOCAL_REFERENCE = "junctionlens/official-evaluator:v2.1.0"
+BUILDER_NAME_PREFIX = "junctionlens-evaluator"
 
 
 class EvaluatorBuildError(RuntimeError):
@@ -42,7 +47,13 @@ def _yaml(path: Path) -> Mapping[str, Any]:
     return payload
 
 
-def _run(command: list[str], root: Path, timeout: int = 3_600) -> str:
+def _run(
+    command: list[str],
+    root: Path,
+    timeout: int = 3_600,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> str:
     result = subprocess.run(
         command,
         cwd=root,
@@ -50,6 +61,7 @@ def _run(command: list[str], root: Path, timeout: int = 3_600) -> str:
         capture_output=True,
         text=True,
         timeout=timeout,
+        env=None if env is None else dict(env),
     )
     if result.returncode != 0:
         raise EvaluatorBuildError(
@@ -64,6 +76,116 @@ def _docker() -> str:
     if executable is None:
         raise EvaluatorBuildError("Docker CLI is unavailable")
     return executable
+
+
+def _builder_spec(root: Path) -> Mapping[str, Any]:
+    images = _yaml(root / "containers/images.lock")
+    builders = images.get("builders")
+    if not isinstance(builders, dict):
+        raise EvaluatorBuildError("image lock has no builders mapping")
+    spec = builders.get("evaluator")
+    if not isinstance(spec, dict):
+        raise EvaluatorBuildError("image lock has no evaluator builder")
+    required = {"driver", "image", "image_index_sha256", "version"}
+    if set(spec) != required:
+        raise EvaluatorBuildError("evaluator builder lock is incomplete")
+    digest = spec.get("image_index_sha256")
+    image = spec.get("image")
+    if (
+        not isinstance(digest, str)
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest)
+        or image != f"docker.io/moby/buildkit@sha256:{digest}"
+    ):
+        raise EvaluatorBuildError("evaluator builder image is not digest-pinned")
+    if spec.get("driver") != "docker-container":
+        raise EvaluatorBuildError("evaluator builder driver is unsupported")
+    version = spec.get("version")
+    version_parts = version.split(".") if isinstance(version, str) else []
+    if len(version_parts) != 3 or not all(part.isdigit() for part in version_parts):
+        raise EvaluatorBuildError("evaluator BuildKit version is invalid")
+    return spec
+
+
+@contextlib.contextmanager
+def _pinned_builder(root: Path, spec: Mapping[str, Any]) -> Iterator[tuple[str, Mapping[str, str]]]:
+    """Create one fresh digest-pinned BuildKit daemon and remove it on exit."""
+    output_root = root / ".cache/evaluator-build"
+    output_root.mkdir(parents=True, exist_ok=True)
+    config = Path(tempfile.mkdtemp(prefix="buildx-config-", dir=output_root))
+    name = f"{BUILDER_NAME_PREFIX}-{uuid.uuid4().hex[:12]}"
+    buildx = str(root / ".tools/bin/docker-buildx")
+    environment = os.environ.copy()
+    environment["BUILDX_CONFIG"] = str(config)
+    created = False
+    primary_error: BaseException | None = None
+    try:
+        _run(
+            [
+                buildx,
+                "create",
+                "--name",
+                name,
+                "--driver",
+                str(spec["driver"]),
+                "--driver-opt",
+                f"image={spec['image']}",
+            ],
+            root,
+            env=environment,
+        )
+        created = True
+        inspection = _run(
+            [buildx, "inspect", name, "--bootstrap"],
+            root,
+            env=environment,
+        )
+        inspection_fields = {
+            key.strip(): value.strip()
+            for line in inspection.splitlines()
+            if ":" in line
+            for key, value in [line.split(":", 1)]
+        }
+        if inspection_fields.get("Driver") != "docker-container":
+            raise EvaluatorBuildError("evaluator builder driver differs from its lock")
+        if inspection_fields.get("BuildKit version") != f"v{spec['version']}":
+            raise EvaluatorBuildError("evaluator BuildKit version differs from its lock")
+        container_name = f"buildx_buildkit_{name}0"
+        configured_image = _run(
+            [
+                _docker(),
+                "container",
+                "inspect",
+                "--format",
+                "{{.Config.Image}}",
+                container_name,
+            ],
+            root,
+            env=environment,
+        ).strip()
+        if configured_image != spec["image"]:
+            raise EvaluatorBuildError("running BuildKit image differs from its lock")
+        yield name, environment
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        cleanup_error: EvaluatorBuildError | None = None
+        if created:
+            try:
+                _run(
+                    [buildx, "rm", "--force", name],
+                    root,
+                    env=environment,
+                )
+            except EvaluatorBuildError as error:
+                cleanup_error = error
+        shutil.rmtree(config, ignore_errors=True)
+        if cleanup_error is not None:
+            if primary_error is not None:
+                primary_error.add_note(f"builder cleanup also failed: {cleanup_error}")
+            else:
+                raise cleanup_error
 
 
 def _prepare_context(root: Path) -> Path:
@@ -142,11 +264,21 @@ def _read_oci(path: Path) -> dict[str, str]:
     }
 
 
-def _build_export(root: Path, context: Path, destination: Path, *, no_cache: bool) -> None:
+def _build_export(
+    root: Path,
+    context: Path,
+    destination: Path,
+    *,
+    builder: str,
+    environment: Mapping[str, str],
+    no_cache: bool,
+) -> None:
     if destination.exists():
         destination.unlink()
     command = [
         str(root / ".tools/bin/docker-buildx"),
+        "--builder",
+        builder,
         "build",
         "--platform",
         "linux/amd64",
@@ -160,7 +292,7 @@ def _build_export(root: Path, context: Path, destination: Path, *, no_cache: boo
     if no_cache:
         command.append("--no-cache")
     command.append(str(context))
-    _run(command, root)
+    _run(command, root, env=environment)
 
 
 def _load_image(root: Path, archive: Path, identity: Mapping[str, str]) -> None:
@@ -184,12 +316,29 @@ def qualify(check_lock: bool) -> dict[str, Any]:
         raise EvaluatorBuildError("run ./tools/jl bootstrap-cpu before building containers")
     context = _prepare_context(root)
     context_sha256 = _context_sha256(context)
+    builder_spec = _builder_spec(root)
     output_root = root / ".cache/evaluator-build"
     first = output_root / "first.oci.tar"
     second = output_root / "second.oci.tar"
-    _build_export(root, context, first, no_cache=True)
+    with _pinned_builder(root, builder_spec) as (builder, environment):
+        _build_export(
+            root,
+            context,
+            first,
+            builder=builder,
+            environment=environment,
+            no_cache=True,
+        )
     first_identity = _read_oci(first)
-    _build_export(root, context, second, no_cache=True)
+    with _pinned_builder(root, builder_spec) as (builder, environment):
+        _build_export(
+            root,
+            context,
+            second,
+            builder=builder,
+            environment=environment,
+            no_cache=True,
+        )
     second_identity = _read_oci(second)
     if first_identity != second_identity:
         raise EvaluatorBuildError(

@@ -1,6 +1,80 @@
 # JunctionLens Build Plan
 
-Status: implementation-ready plan with mandatory data, model, deployment, and evidence gates.
+Status: implementation in progress with the complete local core verified and the consolidated licensed-data and GPU qualification blocked on external prerequisites.
+
+## Implementation stop status on 2026-08-14
+
+This section records the exact safe-boundary state from which implementation resumes.
+It does not weaken any milestone deliverable or acceptance gate below.
+The work-state terms have the meanings defined in Section 28.1.
+
+### Verified local evidence
+
+The repository entry point `./tools/jl verify-local` completed with exit code 0 in 1,251.1 seconds on 2026-08-14 with an isolated local Docker context supplied through `DOCKER_CONTEXT`.
+That gate exercised the public evaluator image build and fixtures, formatting, linting, static analysis, Python tests, native tests, sanitizers, 5,000 seeded fuzz iterations, web tests, security checks, reproducibility checks, integrations, reports, and the documented synthetic workflows.
+The official-evaluator build now uses two independent fresh BuildKit 0.30.0 daemons from the locked OCI index `sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f`.
+Both fresh builders reproduced config `502743806a0c85e837c42e0ffdb30e926e232093b02fad5282909c1754daea33`, platform manifest `82b77905f1fd2b2429aacdf9346f4d6e5d68b2007f9bf6d5570be9156bab812e`, OCI index `728c12638feda9eb0e856a178ff638a5cf02600d1983ad5073aea6343b9fe820`, and unchanged build-context hash `287bdaff92733cc4d7ba6e9ef7be9462d3d111edc42ab2d02043c969186df95d`.
+
+| Plan scope | Local work package | Target-only gate | Exact status at this boundary |
+| --- | --- | --- | --- |
+| M0.1 | `IMPLEMENTED_LOCAL` | `ACCEPTED` | Toolchain, source, archive, runtime, and OCI locks plus truthful doctor probes are implemented and locally verified. |
+| M0.2 and M0.3 | `IMPLEMENTED_LOCAL` | `DEFERRED_HARDWARE` | The evaluator, sample adapter, model spike, export, CPU runtime, and provider probes are verified locally, while licensed full-data and NVIDIA target evidence is not accepted. |
+| M1.1 through M1.3 | `IMPLEMENTED_LOCAL` | `ACCEPTED` | The protobuf contract, validators, geometry core, and unrestricted synthetic corpus pass their complete local gates. |
+| M2.1 through M2.3 | `IMPLEMENTED_LOCAL` | `DEFERRED_HARDWARE` | Adapter, manifest, split, statistical-audit, and visual-audit software is verified, while the licensed selector, frozen full-data manifest, and human visual inspection are not accepted. |
+| M3.1 through M3.3 | `IMPLEMENTED_LOCAL` | `ACCEPTED` | Official fixture parity, graph and temporal KPIs, calibration evidence, and runtime KPI controls pass locally without a licensed-data performance claim. |
+| M4.1 through M5.2 | `IMPLEMENTED_LOCAL` | `DEFERRED_HARDWARE` | E0, the acceptance charter, learned topology, and E1 experiment machinery pass local and synthetic gates, while full-data training, selection, and comparison evidence is not accepted. |
+| M6.1 through M6.3 | `PENDING_LOCAL` | `BLOCKED` | Temporal fusion, calibration promotion, and the frozen E2/E3 study may begin only after the portfolio core target gate is accepted and its measured budget promotion gate passes. |
+| M7.1 through M7.3 | `IMPLEMENTED_LOCAL` | `ACCEPTED` | Registry, comparison, decision, and mandatory seeded fault-lab paths pass their local acceptance gates. |
+| M8.1 | `IMPLEMENTED_LOCAL` | `ACCEPTED` | The C++20 CPU runtime, metadata validation, parity, bounded streaming path, and CPU performance controls pass locally. |
+| M8.2 and M8.3 | `IMPLEMENTED_LOCAL` | `DEFERRED_HARDWARE` | CUDA, conditional TensorRT, benchmark, profiler, stability, and fail-closed qualification automation is implemented, while no accelerated target result is accepted. |
+| M9.1 through M9.3 | `IMPLEMENTED_LOCAL` | `ACCEPTED` | CLI, API, thin comparison viewer, and deterministic evidence reports pass local gates and real-browser synthetic inspection. |
+| M10.1 and M10.2 | `IMPLEMENTED_LOCAL` | `ACCEPTED` | Security hardening, supply-chain checks, clean-checkout synthetic automation, and the complete local verification entry point pass. |
+| Development-complete core checkpoint | `IMPLEMENTED_LOCAL` | `BLOCKED` | Every hardware-independent core package is implemented, but the checkpoint is not accepted without the consolidated licensed-data, GPU, profiler, and signed visual-review evidence. |
+| Conditional TensorRT and richer-dashboard extensions | `PENDING_LOCAL` | `BLOCKED` | Work is held behind accepted core evidence and the Section 29 promotion order. |
+| M11.1 and M11.2 | `PENDING_LOCAL` | `BLOCKED` | The frozen final matrix and independent reproduction require an accepted selected model and accelerated core bundle. |
+| M12.1 and M12.2 | `PENDING_LOCAL` | `BLOCKED` | Final public claims, measured tables, portfolio artifacts, and the release audit require accepted M11 evidence. |
+
+### Exact external blockers
+
+The consolidated core target gate is `BLOCKED` because no compatible NVIDIA GPU SSH target is configured, no existing licensed OpenLane-V2 root is configured on that target, no machine-local license acknowledgment exists, and no human visual-audit signoff exists.
+No milestone, checkpoint, accelerated result, trained-model claim, or release claim is accepted by inference from the local suite.
+
+### Precise resume procedure
+
+From a clean checkout of `origin/main`, first create the ignored license receipt with the exact accepted terms:
+
+```sh
+uv run --locked junctionlens data acknowledge \
+  --accept-term Argoverse-2-terms \
+  --accept-term CC-BY-NC-SA-4.0 \
+  --accept-term nuScenes-terms \
+  --confirm-restricted-noncommercial-use
+```
+
+Configure the external target and run the one consolidated core entry point:
+
+```sh
+export JUNCTIONLENS_GPU_HOST='<private-ssh-alias>'
+export JUNCTIONLENS_REMOTE_ROOT='.junctionlens/qualification'
+export JUNCTIONLENS_REMOTE_DATA_ROOT='<absolute-existing-licensed-openlane-v2-root>'
+./scripts/gpu/qualify_remote.sh --profile core
+```
+
+The first complete core run is expected to return `LICENSED_VISUAL_AUDIT_REVIEW_REQUIRED` after retrieving its independently completed evidence.
+Inspect the retrieved private bundle and, only if every assertion is genuinely satisfied, record the human signoff and resume the same content-addressed run:
+
+```sh
+uv run --locked junctionlens data signoff-visual-audit \
+  --bundle '<downloaded-result>/licensed-data/private-visual-audit' \
+  --accept-camera-projection-alignment \
+  --accept-bev-geometry-alignment \
+  --accept-label-identity-and-topology \
+  --confirm-private-data-handling
+./scripts/gpu/qualify_remote.sh --profile core
+```
+
+Resume M6 only if the retrieved core `status.json` is exactly `PASSED` and the measured promotion gate authorizes the conditional work.
+After M6 and every remaining local extension gate is implemented, committed, and pushed, resume target qualification with `./scripts/gpu/qualify_remote.sh --profile full-v1`.
 
 Planning snapshot: 2026-08-13.
 
@@ -2003,7 +2077,7 @@ Machine-local values are supplied through ignored environment configuration.
 
 A local work package is `PENDING_LOCAL` or `IMPLEMENTED_LOCAL`.
 A target-only gate is `DEFERRED_HARDWARE`, `BLOCKED`, `FAILED`, or `ACCEPTED`.
-A milestone is complete only when every local work package and target gate is `ACCEPTED`.
+A milestone is complete only when every local work package is `IMPLEMENTED_LOCAL` and every applicable target-only gate is `ACCEPTED`.
 
 The implementation agent may continue later hardware-independent work after a target gate becomes `DEFERRED_HARDWARE`.
 It may not mark the milestone, portfolio checkpoint, performance result, or public claim accepted by assumption.
@@ -2135,6 +2209,8 @@ The implementation follows this dependency order: Milestones 0 through 5, Milest
 This order deliberately builds the evaluator and runtime before any temporal model can receive final promotion.
 Each submilestone has a focused commit after its gate passes.
 No commit may combine unverified work from a later milestone merely for convenience.
+When a target-only gate requires clean Git-tracked source, a focused qualification commit may be created and pushed after its complete local work package reaches `IMPLEMENTED_LOCAL`.
+That qualification commit does not mark the submilestone `ACCEPTED`, and the accepted target evidence receives a separate focused commit after the target-only gate passes.
 
 The preferred commit format is Conventional Commits.
 After every verified focused commit, push the current branch to `origin` immediately and confirm that the remote commit matches before continuing.

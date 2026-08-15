@@ -13,11 +13,14 @@ Installing an unpinned host-global plugin would make developer and CI behavior d
 ## Decision
 
 Lock Docker Buildx 0.34.1 for macOS arm64 and Linux x86-64 in the repository toolchain lock.
-The bootstrap installs the verified binary below ignored `.tools` state.
-Container automation exposes it through a machine-local Docker configuration and never modifies the user's global Docker configuration.
+Lock the multi-platform BuildKit 0.30.0 daemon image by OCI index digest in `containers/images.lock`.
+The bootstrap installs the verified Buildx binary below ignored `.tools` state.
+Each independent evaluator build uses a fresh `docker-container` builder backed by the locked BuildKit image and repository-scoped temporary Buildx configuration.
+The automation verifies the running builder's version, driver, and exact configured image before it accepts an export.
+It removes the temporary builder after each export and never modifies the user's global Docker configuration.
 
 OCI builds use `SOURCE_DATE_EPOCH`, the OCI exporter, OCI media types, and timestamp rewriting.
-The manifest and config digests are read from the exported OCI index and frozen in `containers/images.lock` after two independent builds agree.
+The manifest and config digests are read from the exported OCI index and frozen in `containers/images.lock` after builds from two independent fresh builders agree.
 
 ## Evidence
 
@@ -25,8 +28,10 @@ The manifest and config digests are read from the exported OCI index and frozen 
 - Docker reproducible builds: <https://docs.docker.com/build/ci/github-actions/reproducible-builds/>
 - Docker Buildx v0.34.1: <https://github.com/docker/buildx/releases/tag/v0.34.1>
 - Docker Desktop Buildx v0.34.1: <https://github.com/docker/buildx-desktop/releases/tag/v0.34.1-desktop.1>
+- Moby BuildKit v0.30.0: <https://github.com/moby/buildkit/releases/tag/v0.30.0>
 
 ## Consequences
 
-The builder becomes an exact repository input rather than an assumed workstation capability.
+Both the Buildx client and BuildKit daemon become exact repository inputs rather than assumed workstation capabilities.
+Daemon-local cache history cannot affect the locked evaluator identity because each comparison build starts with a fresh builder state.
 The local Docker daemon remains optional for CPU-only work, but evaluator image qualification fails closed when it is absent.
